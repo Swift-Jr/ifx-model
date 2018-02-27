@@ -109,12 +109,12 @@ module.exports = function (grunt) {
             cwd: '<%=config.source %>ci/',
             src: ['**'],
             mode: '0777',
-            dest: '<%=config.build %>application'
+            dest: '<%=config.build %>'
         },
 
         ciconfig: {
             expand: true,
-            cwd: '<%=config.source %>ci/ifx/setup/',
+            cwd: '<%=config.source %>ci/application/ifx/setup/',
             src: ['**'],
             mode: '0777',
             dest: '<%=config.build %>application'
