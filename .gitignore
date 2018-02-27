@@ -1,1 +1,4 @@
-
+/ci/
+/phpunit/
+/build/
+/node_modules/
