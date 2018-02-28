@@ -1585,15 +1585,19 @@ class ifx_Model extends CI_Model
         $this->db->saveSetup();
 
         //Ensure the select statement is correct
-        $ExistingSelect = explode(',',
-                        preg_filter('/SELECT (.*) FROM .+/i', '$1',
-                            $this->db->get_compiled_select($this->_table())));
+        $CompiledStatement = $this->db->get_compiled_select($this->_table());
+        $CompiledFields = preg_filter('/SELECT (.*)\sFROM[\s\S]*/i', '$1', $CompiledStatement);
+        $ExistingSelect = explode(',', $CompiledFields);
 
         $this->db->restoreSetup();
 
         $SelectStatement = '';
         if ($FullRowCount) {
             $SelectStatement = 'SQL_CALC_FOUND_ROWS ';
+        }
+
+        if (count($ExistingSelect) == 1 && $ExistingSelect[0] == '*') {
+            unset($ExistingSelect[0]);
         }
 
         count($ExistingSelect) > 0 && $ExistingSelect[0] !== '' or $SelectStatement .= '`'.$this->_table().'`.* ';

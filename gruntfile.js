@@ -26,6 +26,7 @@ module.exports = function (grunt) {
     ];
 
     var retestList = [
+        'copy:sourcephp',
         'copy:phpunitci',
         'copy:citests',
         'shell:tests'
@@ -42,6 +43,7 @@ module.exports = function (grunt) {
     ];
 
     var testDebugList = [
+        'copy:sourcephp',
         'copy:phpunitci',
         'copy:citests',
         'shell:tests_debug'
@@ -50,7 +52,7 @@ module.exports = function (grunt) {
     grunt.registerTask('install', installList);
     grunt.registerTask('test', testList);
     grunt.registerTask('retest', retestList);
-    grunt.registerTask('debug', retestList);
+    grunt.registerTask('debug', testDebugList);
 
     //TASK CONFIG
 
