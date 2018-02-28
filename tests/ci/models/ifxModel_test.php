@@ -927,6 +927,22 @@ class ifxModel_test extends TestCase
         $this->assertSame($Expected, $ActualResult);
     }
 
+    public function test_fetch_custom_select()
+    {
+        $Model = new mParent();
+        $Model->db->select('title')
+                    ->select('anumber AS bnumber')
+                    ->select('1 AS cnumber')
+                    ->limit(1);
+
+        $Result = $Model->fetch();
+
+        $this->assertTrue(array_key_exists('title', reset($Result)->_data));
+        $this->assertTrue(array_key_exists('bnumber', reset($Result)->_data));
+        $this->assertTrue(array_key_exists('cnumber', reset($Result)->_data));
+        $this->assertFalse(array_key_exists('anumber', reset($Result)->_data));
+    }
+
 
     //Via returns a joined dataset
     //e.g. $Customer->with('orders/status')->fetch() returns customer+orders+status
