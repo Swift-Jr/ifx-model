@@ -675,7 +675,12 @@ class ifx_Model extends CI_Model
             $this->_identity = $this->sanitizeName($this->_identity);
 
             if (!$this->field_exists($this->_identity)) {
-                throw new Exception("The key {$this->_identity} does not exist on {$this->_tablename}");
+                $this->_identity = $this->_table().'_id';
+                $this->_identity = $this->sanitizeName($this->_identity);
+                
+                if (!$this->field_exists($this->_identity)) {
+                    throw new Exception("The key {$this->_identity} does not exist on {$this->_tablename}");
+                }
             }
         }
         return $this->_identity;

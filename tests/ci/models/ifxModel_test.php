@@ -13,6 +13,11 @@ class mSpecial extends ifx_Model
     const special = 'reallyspecial';
 }
 
+class mLessSpecial extends ifx_Model
+{
+    const lessspecial = 'bitspecial';
+}
+
 class mParent extends ifx_Model
 {
     public static $labels = [
@@ -122,6 +127,10 @@ class ifxModel_test extends TestCase
                 FOREIGN KEY(brother_id) REFERENCES brother(brother_id),
                 FOREIGN KEY(sister_id) REFERENCES sister(sister_id)
             );',
+            'CREATE TABLE bitspecial (
+                bitspecial_id INT NOT NULL AUTO_INCREMENT,
+                PRIMARY KEY(bitspecial_id)
+            );',
             'CREATE TABLE reallyspecial (
                 notspecial_id INT NOT NULL AUTO_INCREMENT,
                 PRIMARY KEY(notspecial_id)
@@ -218,6 +227,7 @@ class ifxModel_test extends TestCase
             'DROP TABLE IF EXISTS sister;',
             'DROP TABLE IF EXISTS siblings;',
             'DROP TABLE IF EXISTS reallyspecial;',
+            'DROP TABLE IF EXISTS bitspecial;',
             'DROP TABLE IF EXISTS country;',
             'DROP TABLE IF EXISTS city;',
             'DROP TABLE IF EXISTS town;',
@@ -679,6 +689,9 @@ class ifxModel_test extends TestCase
 
     public function test_id()
     {
+        $LessSpecial = new mLessSpecial();
+        $this->assertEquals($LessSpecial->_id(), 'bitspecial_id');
+
         $Brother = new mBrother();
         $this->assertNull($Brother->id());
 
