@@ -101,7 +101,7 @@
                     $Value = $Key;
                 }
 
-                if (!($this->optionFilterFn)($Key, $Value)) {
+                if (!($this->optionFilterFn)($Key, $Value, $OptionValue)) {
                     continue;
                 } ?>
                 <option value="<?=$Key?>"
