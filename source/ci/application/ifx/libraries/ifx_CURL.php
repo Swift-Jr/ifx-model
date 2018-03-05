@@ -41,4 +41,13 @@
 
             return $return;
         }
+
+        final public function header($Header, $Reset = false)
+        {
+            if ($Reset) {
+                $this->CURL_OPT[CURLOPT_HTTPHEADER] = [];
+            }
+
+            $this->CURL_OPT[CURLOPT_HTTPHEADER][] = $Header;
+        }
     }
