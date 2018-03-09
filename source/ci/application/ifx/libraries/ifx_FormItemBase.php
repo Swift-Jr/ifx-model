@@ -30,11 +30,11 @@
 
         public function __construct()
         {
-            $this->customValueFormatter = function ($Value) {
+            $this->customValueFormatter = function ($Value, $Key) {
                 return $Value;
             };
-            $this->customKeyFormatter = function ($Value) {
-                return $Value;
+            $this->customKeyFormatter = function ($Key, $Value) {
+                return $Key;
             };
         }
         public function bindTo($Model, $Field = null)
