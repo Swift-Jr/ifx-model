@@ -105,7 +105,7 @@
                     continue;
                 } ?>
                 <option value="<?=$Key?>"
-                        <?=($this->value() == $OptionValue)?'selected="selected"':''?>
+                        <?=($this->value() == $Key)?'selected="selected"':''?>
                         <?=$OptionCustom?>>
                     <?=$Value?>
                 </option>
