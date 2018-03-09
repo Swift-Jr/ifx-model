@@ -101,11 +101,11 @@
                     $Value = $Key;
                 }
 
-                if (!($this->optionFilterFn)($Key, $Value)) {
+                if (!($this->optionFilterFn)($Key, $Value, $OptionValue)) {
                     continue;
                 } ?>
                 <option value="<?=$Key?>"
-                        <?=($this->value() == $Key)?'selected="selected"':''?>
+                        <?=($this->value() == $OptionValue)?'selected="selected"':''?>
                         <?=$OptionCustom?>>
                     <?=$Value?>
                 </option>

@@ -108,7 +108,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
                 $parts[] = rtrim(ltrim($fn, '/'), '/');
             }
 
-            return strtolower(implode($parts, '/').'/');
+            return '/'.strtolower(implode($parts, '/').'/');
         }
     }
 
