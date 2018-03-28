@@ -186,6 +186,11 @@
         public $formatFn = null;
         public $defaultSort = false;
 
+        public static function create($Fieldname, $Displayname = null, $Table = null)
+        {
+            return new self($Fieldname, $Displayname, $Table);
+        }
+
         public function __construct($Fieldname = null, $Displayname = null, $Table = null)
         {
             $this->formatFn = function ($Row, $Value) {
