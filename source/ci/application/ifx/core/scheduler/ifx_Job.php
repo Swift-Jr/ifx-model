@@ -95,6 +95,11 @@
             }
         }
 
+        public function store_message($message)
+        {
+            ifx_Scheduler_History::create('WORKER', $this->worker->id(), $this->name. ': '.$message, $this->_data);
+        }
+
         public function complete()
         {
             $this->status = static::JOB_STATE_COMPLETE;
