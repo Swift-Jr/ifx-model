@@ -1357,8 +1357,9 @@ class ifx_Model extends CI_Model
         }
 
         $pending_save_key = md5(serialize(array_map(function ($Value) {
-            return  is_callable($Value) ? false : $Value;
+            return  (is_callable($Value) || is_object($Value)) ? false : $Value;
         }, $this->_data)));
+
         //Stop any recursion when saving linked items
         if (isset(static::$_pending_save[$pending_save_key])) {
             return true;
