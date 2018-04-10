@@ -3,6 +3,11 @@
     {
         public static function create($JobOrWorker, $JobWorkerId, $Message, $AdditionalData = [])
         {
+            if (SCHEDULER_DEBUG_MODE) {
+                print_r($Message);
+                return true;
+            }
+
             switch (strtolower($JobOrWorker)) {
                 case '0':
                 case 'worker':
