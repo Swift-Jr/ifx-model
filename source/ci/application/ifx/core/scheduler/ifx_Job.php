@@ -111,10 +111,10 @@
         public function store_message($message)
         {
             if (SCHEDULER_DEBUG_MODE) {
-                print_r($Message);
+                print_r($message);
                 return true;
             }
-            
+
             ifx_Scheduler_History::create('WORKER', $this->worker->id(), $this->name. ': '.$message, $this->_data);
         }
 
