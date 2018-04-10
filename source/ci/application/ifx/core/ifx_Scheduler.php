@@ -258,6 +258,29 @@
             $Worker->run();
         }
 
+        public function test_job($Secret, $JobName)
+        {
+            if ($Secret !== static::SECRET) {
+                throw new ifx_Scheduler_Exception("Duff secret provided for $JobName ($JobName)");
+            }
+
+            ifx_Scheduler_History::create('WORKER', $this->id(), $this->name. ' testing sample job name:'.$JobName, $this->_data);
+
+            try {
+                ifx_Job::load_job_handeler($JobName);
+                $Job = new $JobName();
+
+                if ($Job->test()) {
+                    ifx_Scheduler_History::create('WORKER', $this->id(), $this->name. ' TEST SUCCESS:'.$JobName, $Job->_data);
+                } else {
+                    ifx_Scheduler_History::create('WORKER', $this->id(), $this->name. ' TEST FAILED:'.$JobName, $Job->_data);
+                }
+            } catch (Exception $e) {
+                //Failed, record the error
+                ifx_Scheduler_History::create('WORKER', $this->id(), $this->name. ' TEST PROCESS FAILED:'.$JobName, $Job->_data);
+            }
+        }
+
         public function edit_worker($WorkerID = null)
         {
             $Worker = new ifx_Worker($WorkerID);

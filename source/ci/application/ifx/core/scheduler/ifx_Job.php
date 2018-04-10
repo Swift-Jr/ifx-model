@@ -60,14 +60,7 @@
             $Job->db->limit(1);
             $Job->load();
 
-            $Object = $Job->name;
-            $JobPath = APPPATH."/jobs/$Object.php";
-
-            if (file_exists($JobPath)) {
-                require($JobPath);
-            } else {
-                ifx_Scheduler_History::create('WORKER', $Worker->id(), 'Invalid job path: '.$JobPath, $Worker->_data);
-            }
+            static::load_job_handeler($Job->name, $Worker);
 
             $Job = new $Object($Job->id());
 
@@ -82,6 +75,21 @@
             return $Job;
         }
 
+        public static function load_job_handeler($HandelerName, $Worker = null)
+        {
+            if (is_null($Worker)) {
+                $Worker = new ifx_Worker();
+            }
+
+            $JobPath = APPPATH."/jobs/$HandelerName.php";
+
+            if (file_exists($JobPath)) {
+                require($JobPath);
+            } else {
+                ifx_Scheduler_History::create('WORKER', $Worker->id(), 'Invalid job path: '.$JobPath, $Worker->_data);
+            }
+        }
+
         public function begin()
         {
             $this->status = static::JOB_STATE_RUNNING;
@@ -93,6 +101,11 @@
                 }
                 return call_user_func_array([$that, 'run'], $this->params);
             }
+        }
+
+        public function test()
+        {
+            $this->run();
         }
 
         public function store_message($message)
