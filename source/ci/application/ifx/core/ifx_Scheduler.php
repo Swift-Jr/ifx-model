@@ -326,7 +326,6 @@
                   ->name('queuename')
                   ->bindTo($Worker)
                   ->display();
-            ;
 
             $Input = new ifx_Input('input', 'text');
             $Input->placeholder('time in seconds')
