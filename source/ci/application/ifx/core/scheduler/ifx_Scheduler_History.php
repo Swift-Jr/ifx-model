@@ -3,15 +3,25 @@
     {
         public static function create($JobOrWorker, $JobWorkerId, $Message, $AdditionalData = [])
         {
-            switch ($JobOrWorker) {
+            switch (strtolower($JobOrWorker)) {
                 case '0':
-                case 'Worker':
-                case 'WORKER':
+                case 'worker':
                     $JobOrWorker = 0;
                 break;
-                default:
-                    //job
+
+                case '1':
+                case 'job':
                     $JobOrWorker = 1;
+                break;
+
+                case '2':
+                case 'test':
+                    $JobOrWorker = 2;
+                break;
+
+                default:
+                    throw new Exception("$JobOrWorker not valid vazlue for \$JobOrWorker", 1);
+
             }
             $ProcessID = isset($AdditionalData['process_id'])? $AdditionalData['process_id'] : null;
 
