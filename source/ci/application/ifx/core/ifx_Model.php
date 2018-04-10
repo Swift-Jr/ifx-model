@@ -69,19 +69,19 @@ class ifx_Model extends CI_Model
         $this->db = &$this->ci->db;
         $this->_validation = ifx_Model_Validation::get_instance();
 
-            //Clean up relationships
-            if ($Object !== false) {
-                if (!is_array($this->has_one)) {
-                    $this->has_one = [$this->has_one];
-                }
-                $this->sanitizeRelationships($this->has_one);
-                $this->sanitizeRelationships($this->has_many);
+        //Clean up relationships
+        if ($Object !== false) {
+            if (!is_array($this->has_one)) {
+                $this->has_one = [$this->has_one];
             }
+            $this->sanitizeRelationships($this->has_one);
+            $this->sanitizeRelationships($this->has_many);
+        }
 
-            //Passed something to load?
-            if (is_numeric($Object) || is_object($Object)) {
-                $this->load($Object);
-            }
+        //Passed something to load?
+        if (is_numeric($Object) || is_object($Object)) {
+            $this->load($Object);
+        }
     }
 
     /**
@@ -356,11 +356,11 @@ class ifx_Model extends CI_Model
         $name = $this->sanitizeName($name);
 
         //Check relationships
-    if (isset($this->has_one[$name]) /*&& isset($this->_objects[$name])*/) {
-        //if ($this->is_loaded()) {
+        if (isset($this->has_one[$name]) /*&& isset($this->_objects[$name])*/) {
+            //if ($this->is_loaded()) {
             $Model = $this->$name;
-        return is_subclass_of($Model, get_class(new self()));
-    }
+            return is_subclass_of($Model, get_class(new self()));
+        }
 
         if (isset($this->has_many[$name]) /*&& isset($this->_objects[$name])*/) {
             return count($this->$name) > 0;
@@ -496,9 +496,9 @@ class ifx_Model extends CI_Model
 
         if (isset($this->has_many[$name])) {
             //See if this already exists as a child
-                $found = !isset($this->$name) ? [] : array_filter($this->$name, static function ($model) use ($value) {
-                    return $model == $value or $model->is_loaded() && $value->is_loaded() && $model->id() == $value->id();
-                });
+            $found = !isset($this->$name) ? [] : array_filter($this->$name, static function ($model) use ($value) {
+                return $model == $value or $model->is_loaded() && $value->is_loaded() && $model->id() == $value->id();
+            });
 
             if (!isset($this->$name) || count($found) == 0) {
                 //If its not set, or its not found in current list
@@ -512,11 +512,11 @@ class ifx_Model extends CI_Model
                 }
             } elseif (count($found) == 1) {
                 //If its found, then replace it
-                    array_walk($this->_objects[$name], function ($model, $key) use ($name, $value) {
-                        if ($model->id() == $value->id()) {
-                            $this->_objects[$name][$value->id()] = $value;
-                        }
-                    });
+                array_walk($this->_objects[$name], function ($model, $key) use ($name, $value) {
+                    if ($model->id() == $value->id()) {
+                        $this->_objects[$name][$value->id()] = $value;
+                    }
+                });
             }
             return;
         }
@@ -677,7 +677,7 @@ class ifx_Model extends CI_Model
             if (!$this->field_exists($this->_identity)) {
                 $this->_identity = $this->_table().'_id';
                 $this->_identity = $this->sanitizeName($this->_identity);
-                
+
                 if (!$this->field_exists($this->_identity)) {
                     throw new Exception("The key {$this->_identity} does not exist on {$this->_tablename}");
                 }
@@ -1356,7 +1356,9 @@ class ifx_Model extends CI_Model
             }
         }
 
-        $pending_save_key = md5(serialize($this->_data));
+        $pending_save_key = md5(serialize(array_map(function ($Value) {
+            return $Value instanceof Closure ? false : $Value;
+        }, $this->_data)));
         //Stop any recursion when saving linked items
         if (isset(static::$_pending_save[$pending_save_key])) {
             return true;

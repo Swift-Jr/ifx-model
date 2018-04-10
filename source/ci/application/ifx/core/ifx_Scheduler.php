@@ -268,18 +268,13 @@
 
             ifx_Scheduler_History::create('test', 0, 'Testing sample job name:'.$JobName);
 
-            try {
-                ifx_Job::load_job_handeler($JobName);
-                $Job = new $JobName();
+            ifx_Job::load_job_handeler($JobName);
+            $Job = new $JobName();
 
-                if ($Job->test()) {
-                    ifx_Scheduler_History::create('test', 0, 'TEST SUCCESS:'.$JobName, $Job->_data);
-                } else {
-                    ifx_Scheduler_History::create('test', 0, 'TEST FAILED:'.$JobName, $Job->_data);
-                }
-            } catch (Exception $e) {
-                //Failed, record the error
-                ifx_Scheduler_History::create('test', 0, ' TEST PROCESS FAILED:'.$e->message, $Job->_data);
+            if ($Job->test()) {
+                ifx_Scheduler_History::create('test', 0, 'TEST SUCCESS:'.$JobName, $Job->_data);
+            } else {
+                ifx_Scheduler_History::create('test', 0, 'TEST FAILED:'.$JobName, $Job->_data);
             }
         }
 
