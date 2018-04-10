@@ -261,7 +261,7 @@
         public function test_job($Secret, $JobName)
         {
             define('SCHEDULER_DEBUG_MODE', 1);
-            
+
             if ($Secret !== static::SECRET) {
                 throw new Exception("Duff secret provided for $JobName ($JobName)");
             }
@@ -279,7 +279,7 @@
                 }
             } catch (Exception $e) {
                 //Failed, record the error
-                ifx_Scheduler_History::create('test', 0, $this->name. ' TEST PROCESS FAILED:'.$JobName, $Job->_data);
+                ifx_Scheduler_History::create('test', 0, ' TEST PROCESS FAILED:'.$e->message, $Job->_data);
             }
         }
 
