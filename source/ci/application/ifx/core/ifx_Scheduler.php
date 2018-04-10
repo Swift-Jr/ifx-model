@@ -260,6 +260,8 @@
 
         public function test_job($Secret, $JobName)
         {
+            define('SCHEDULER_DEBUG_MODE', 1);
+            
             if ($Secret !== static::SECRET) {
                 throw new Exception("Duff secret provided for $JobName ($JobName)");
             }
