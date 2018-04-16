@@ -112,7 +112,7 @@
 
         public function store_message($message)
         {
-            if (SCHEDULER_DEBUG_MODE) {
+            if (defined('SCHEDULER_DEBUG_MODE')) {
                 print_r($message.'<br />');
                 return true;
             }
