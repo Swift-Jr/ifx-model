@@ -20,7 +20,9 @@
         {
             parent::__construct();
             $this->_table('ifx_job');
-            $this->load($ID);
+            if (!is_null($ID)) {
+                $this->load($ID);
+            }
             $this->worker = $Worker;
         }
 
