@@ -63,6 +63,7 @@
             $Job->load();
 
             static::load_job_handeler($Job->name, $Worker);
+            $Object = $Job->name;
 
             $Job = new $Object($Job->id());
 
@@ -79,6 +80,10 @@
 
         public static function load_job_handeler($HandelerName, $Worker = null)
         {
+            if (class_exists($HandelerName)) {
+                return true;
+            }
+
             if (is_null($Worker)) {
                 $Worker = new ifx_Worker();
             }
