@@ -476,9 +476,12 @@ class ifx_Model extends CI_Model
                 list($Alias, $Model, $Form, $Field, $Table, $Location) = $this->decode($name);
                 switch ($Location) {
                     case 'LOCAL':
-                        if ($this->_data[$Field] != $value) {
-                            $this->_affected_fields[$Field] = $this->_data[$Field];
-                        }
+                      if (!isset($this->_data[$Field])) {
+                          $this->_data[$Field] = null;
+                      }
+                      if ($this->_data[$Field] != $value) {
+                          $this->_affected_fields[$Field] = $this->_data[$Field];
+                      }
                         $this->_data[$Field] = null;
                     break;
                     case 'REMOTE':
