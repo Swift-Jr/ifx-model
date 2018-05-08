@@ -22,7 +22,8 @@ module.exports = function (grunt) {
         'clean:node_ci',
         'shell:codeignighter',
         'clean:phpunit',
-        'shell:phpunit'
+        'shell:phpunit',
+        'shell:phpunit_install'
     ];
 
     var retestList = [
@@ -126,6 +127,9 @@ module.exports = function (grunt) {
     grunt.config('shell', {
         codeignighter : {
             command: 'git clone --branch master https://github.com/bcit-ci/CodeIgniter.git <%=config.ciroot %>',
+        },
+        phpunit_install: {
+            command: 'curl https://phar.phpunit.de/phpunit-6.0.13.phar -o phpunit.phar; chmod +x phpunit.phar; sudo mv phpunit.phar /usr/local/bin/phpunit; phpunit --version;'
         },
         phpunit: {
             command: 'git clone --branch master https://github.com/kenjis/ci-phpunit-test.git <%=config.phpunitroot %>',

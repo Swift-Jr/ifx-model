@@ -116,6 +116,7 @@
                       $Status[0] = 'Inactive';
                       $Status[1] = 'Ready';
                       $Status[2] = 'Busy';
+                      $Status[3] = 'Sleeping';
 
                       return $Status[$Value];
                   });
@@ -127,6 +128,10 @@
                   ->formatter(function ($Row, $Value) {
                       return number_format(round($Value/pow(1024, 1))).'kb';
                   });
+            ifx_TColumn::create('memory_usage_max', 'Memory Usage (Peak)', $WorkerStatus)
+                ->formatter(function ($Row, $Value) {
+                    return number_format(round($Value/pow(1024, 1))).'kb';
+                });
             ifx_TColumn::create('jobs_queued', 'Pending', $WorkerStatus)
                   ->formatter(function ($Row) {
                       $Jobs = new ifx_Job();
@@ -178,6 +183,11 @@
                   ->formatter(function ($Row, $Value) {
                       $URL = autoUrl('worker_history/'.$Row->id());
                       return '<a href="'.$URL.'"><i class="fa fa-2x fa-history text-secondary"></i></a>';
+                  });
+            ifx_TColumn::create('debug', 'Debug', $WorkerStatus)
+                  ->formatter(function ($Row, $Value) {
+                      $URL = autoUrl('run_worker_manual/'.static::SECRET.'/'.$Row->id().'/'.rawurlencode($Row->name));
+                      return '<a href="'.$URL.'"><i class="fa fa-2x fa-play text-secondary"></i></a>';
                   });
 
             $WorkerStatus->display();
@@ -254,6 +264,7 @@
             set_time_limit(120);
 
             $Worker = new ifx_Worker($WorkerID);
+            $Worker->stop();
             $Worker->enable();
             $Worker->run();
         }

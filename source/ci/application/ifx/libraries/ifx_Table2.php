@@ -11,6 +11,7 @@
         private $pageLimit = 10;
         private $pageOffset = 0;
         private $sortedBy = array();
+        private $pageLimitOptions = [5=>5,10=>10,25=>25,50=>50,100=>100,200=>200];
 
         public function __construct($Model)
         {
@@ -25,7 +26,8 @@
             //Load some settings
             $Saved = $this->ci->session->flashdata($this->Obj->_table());
             if ($Saved) {
-                $this->sortedBy = $Saved['sortedBy'];
+                $this->sortedBy = isset($Saved['sortedBy']) ? $Saved['sortedBy'] : $this->sortedBy;
+                $this->pageLimit = isset($Saved['pageLimit']) ? $Saved['pageLimit'] : $this->pageLimit;
             }
 
             if (isset($_POST['ifxTable'])) {
@@ -48,6 +50,7 @@
         public function saveSettings()
         {
             $Save['sortedBy'] = $this->sortedBy;
+            $Save['pageLimit'] = $this->pageLimit;
             $this->ci->session->set_flashdata($this->Obj->_table(), $Save);
             return $this;
         }
@@ -61,6 +64,11 @@
         {
             $this->pageLimit = $Limit;
             $this->pageOffset = $Offset;
+        }
+
+        public function setLimit($Limit = 10)
+        {
+            $this->pageLimit = $Limit;
         }
 
         public function getObjData()
@@ -85,15 +93,32 @@
                 $this->Obj->db->limit($this->pageLimit);
             } else {
                 $this->pageLimit = 10;
-                $this->Obj->db->limit(10);
+                $this->Obj->db->limit($this->pageLimit);
             }
 
             if ($this->pageOffset !== false) {
-                $this->Obj->db->offset($this->pageOffset*$this->pageLimit);
+                $this->Obj->db->offset($this->firstRecordInResults());
             } else {
                 $this->pageOffset = 0;
                 $this->Obj->db->offset(0);
             }
+        }
+
+        private function firstRecordInResults()
+        {
+            return $this->pageOffset*$this->pageLimit;
+        }
+
+        private function recordsStartingFrom()
+        {
+            return ($this->pageOffset < 1 ? 0 : $this->firstRecordInResults())+1;
+        }
+
+        private function recordsEndingAt()
+        {
+            $EndOfPage = $this->pageOffset < 1 ? $this->pageLimit : $this->pageLimit * ($this->pageOffset+1);
+
+            return min($EndOfPage, $this->Obj->count_all());
         }
 
         public function display()
@@ -161,8 +186,17 @@
             echo '<tfoot>';
             echo '<tr><td colspan="'.count($this->Columns).'">';
             echo '<div class="page-of-page">';
-            echo(($this->pageOffset<1?0:$this->pageLimit * ($this->pageOffset))+1).'-'.min($this->pageOffset<1?$this->pageLimit:$this->pageLimit * ($this->pageOffset+1), $this->Obj->count_all()).' / '.$this->Obj->count_all();
+            echo $this->recordsStartingFrom().'-'.$this->recordsEndingAt().' / '.$this->Obj->count_all();
             echo '</div>';
+
+            echo '<form class="page-size" method="POST">';
+            $PageSizeSelector = new ifx_Select($this->pageLimitOptions);
+            $PageSizeSelector->value($this->pageLimit)
+                ->name('ifxTable[pageLimit]')
+                ->attr('onChange', 'this.form.submit();')
+                ->display();
+            echo '</form>';
+
             echo '<form class="page-list" method="POST"><ul>';
             for ($page = 0; $page <= ($this->Obj->count_all()/$this->pageLimit); $page++) {
                 echo '<li'.($page==$this->pageOffset?' class="active"':'').'><button type="submit" name="ifxTable[pageOffset]" value="'.$page.'">'.($page+1).'</button></li>';

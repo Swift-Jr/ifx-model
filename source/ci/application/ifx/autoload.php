@@ -4,7 +4,8 @@ class ifx_Autoloader
     private $_ci_paths = array(
         'core',
         'libraries',
-        'models'
+        'models',
+        'jobs'
     );
 
     private $_ifx_paths = array(

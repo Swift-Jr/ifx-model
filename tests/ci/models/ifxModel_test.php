@@ -87,6 +87,16 @@ class mSame extends ifx_Model
     public $has_one = ['next' => ['same', 'next_id']];
 }
 
+class mMany extends ifx_Model
+{
+    public $has_many = ['multiple'];
+}
+
+class mMultiple extends ifx_Model
+{
+    public $has_many = ['many'];
+}
+
 class ifxModel_test extends TestCase
 {
     public function setUp()
@@ -173,6 +183,22 @@ class ifxModel_test extends TestCase
                 PRIMARY KEY(same_id),
                 FOREIGN KEY(next_id) REFERENCES same(same_id)
             );',
+            'CREATE TABLE many_multiple (
+                many_multiple_id INT NOT NULL AUTO_INCREMENT,
+                many_id INT NOT NULL,
+                multiple_id INT NOT NULL,
+                PRIMARY KEY(many_multiple_id),
+                FOREIGN KEY(many_id) REFERENCES many(many_id),
+                FOREIGN KEY(multiple_id) REFERENCES multiple(multiple_id)
+            );',
+            'CREATE TABLE many (
+                many_id INT NOT NULL AUTO_INCREMENT,
+                PRIMARY KEY(many_id)
+            );',
+            'CREATE TABLE multiple (
+                multiple_id INT NOT NULL AUTO_INCREMENT,
+                PRIMARY KEY(multiple_id)
+            );',
 
             'INSERT INTO parent (parent_id, anumber) VALUES (1, 10);',
             'INSERT INTO parent (parent_id, anumber) VALUES (2, 15);',
@@ -203,9 +229,15 @@ class ifxModel_test extends TestCase
             'INSERT INTO town (town_id, name, city_id) VALUES (4, "Queens", 3);',
             'INSERT INTO town (town_id, name, city_id) VALUES (5, "Washington", 4);',
 
-            'INSERT INTO number (number_id, number) VALUES (1,1), (2,4), (3,2), (4,5), (5,3)',
+            'INSERT INTO number (number_id, number) VALUES (1,1), (2,4), (3,2), (4,5), (5,3);',
 
-            'INSERT INTO same (same_id, next_id, name) VALUES (2, null, "Two"), (1, 2, "One")'
+            'INSERT INTO same (same_id, next_id, name) VALUES (2, null, "Two"), (1, 2, "One"), (3, null, "Three");',
+
+            'INSERT INTO many (many_id) VALUES (1), (2), (3);',
+
+            'INSERT INTO multiple (multiple_id) VALUES (1), (2), (3);',
+
+            'INSERT INTO many_multiple (multiple_id, many_id) VALUES (1,1), (1,2), (2,1), (2,2);',
         ];
 
         $ci =& get_instance();
@@ -234,6 +266,9 @@ class ifxModel_test extends TestCase
             'DROP TABLE IF EXISTS twinned;',
             'DROP TABLE IF EXISTS number;',
             'DROP TABLE IF EXISTS same;',
+            'DROP TABLE IF EXISTS many;',
+            'DROP TABLE IF EXISTS multiple;',
+            'DROP TABLE IF EXISTS many_multiple;',
         ];
 
         $ci =& get_instance();
@@ -456,6 +491,24 @@ class ifxModel_test extends TestCase
         $this->assertEquals($ExpectedParentRelationship, $ParentRelationship);
     }
 
+    public function test_decode_relationship_many_many()
+    {
+        $Many = new mMany();
+        $Multiple = new mMultiple();
+
+        $Relationship = $Many->decode($Multiple);
+
+        $ExpectedRelationship = ['multiple', 'mMultiple', 3, null, 'many_multiple', 'BETWEEN'];
+
+        $this->assertEquals($ExpectedRelationship, $Relationship);
+
+        $Relationship = $Multiple->decode($Many);
+
+        $ExpectedRelationship = ['many', 'mMany', 3, null, 'many_multiple', 'BETWEEN'];
+
+        $this->assertEquals($ExpectedRelationship, $Relationship);
+    }
+
     public function test_decode_alias()
     {
         // list($Alias, $Model, $Form, $KeyField, $KeyTable, $KeyLocation)
@@ -515,6 +568,7 @@ class ifxModel_test extends TestCase
 
         $this->assertEquals($Expected, $Actual);
     }
+
 
     public function test__isset()
     {
@@ -757,6 +811,48 @@ class ifxModel_test extends TestCase
         $this->assertFalse($Parent->table_exists('madeup'));
     }
 
+    public function test_relationship_exists_with_one()
+    {
+        $One = new mSame(1);
+        $Two = new mSame(2);
+
+        $this->assertTrue($One->relationship_exists_with($Two));
+        $this->assertFalse($Two->relationship_exists_with($One));
+
+        $Two = new mSame(3);
+
+        $this->assertFalse($One->relationship_exists_with($Two));
+        $this->assertFalse($Two->relationship_exists_with($One));
+    }
+
+    public function test_relationship_exists_with_many()
+    {
+        $Parent = new mCountry(1);
+        $Child = new mCity(1);
+
+        $this->assertTrue($Parent->relationship_exists_with($Child));
+        $this->assertTrue($Child->relationship_exists_with($Parent));
+
+        $Child = new mCity(3);
+
+        $this->assertFalse($Parent->relationship_exists_with($Child));
+        $this->assertFalse($Child->relationship_exists_with($Parent));
+    }
+
+    public function test_relationship_exists_with_many_many()
+    {
+        $Many = new mMany(1);
+        $Multiple = new mMultiple(2);
+
+        $this->assertTrue($Many->relationship_exists_with($Multiple));
+        $this->assertTrue($Multiple->relationship_exists_with($Many));
+
+        $Multiple = new mMultiple(3);
+
+        $this->assertFalse($Multiple->relationship_exists_with($Many));
+        $this->assertFalse($Many->relationship_exists_with($Multiple));
+    }
+
     public function test_count()
     {
         $Parent = new mParent();
@@ -792,7 +888,7 @@ class ifxModel_test extends TestCase
             'parent_id' => '99',
             'title' => 'sample title',
             'anumber' => '74',
-            'deciaml' => '0.00',
+            'decimal' => '0.00',
             'long_deciaml' => '1.2345'
         ];
 
@@ -800,7 +896,7 @@ class ifxModel_test extends TestCase
             'parent_id' => 99,
             'title' => 'sample title',
             'anumber' => 74,
-            'deciaml' => 0,
+            'decimal' => 0,
             'long_deciaml' => 1.2345
         ];
 
@@ -1188,10 +1284,10 @@ class ifxModel_test extends TestCase
 
         $this->assertTrue($Result);
         //these tests need an ->add_relationship(alias, object) function
-        /*$this->assertTrue($FirstCity->is_loaded());
-        $this->assertTrue($SecondCity->is_loaded());
-        $this->assertTrue(is_numeric($FirstCity->id()));
-        $this->assertTrue(is_numeric($SecondCity->id()));*/
+        //$this->assertTrue($FirstCity->is_loaded());
+        //$this->assertTrue($SecondCity->is_loaded());
+        //$this->assertTrue(is_numeric($FirstCity->id()));
+        //$this->assertTrue(is_numeric($SecondCity->id()));
 
         $Verify = new mCity();
         $Verify->name = 'Sevile';

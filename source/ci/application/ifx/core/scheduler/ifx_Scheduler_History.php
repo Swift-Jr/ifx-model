@@ -3,7 +3,7 @@
     {
         public static function create($JobOrWorker, $JobWorkerId, $Message, $AdditionalData = [])
         {
-            if (SCHEDULER_DEBUG_MODE) {
+            if (defined('SCHEDULER_DEBUG_MODE')) {
                 print_r($Message.'<br />');
                 return true;
             }
