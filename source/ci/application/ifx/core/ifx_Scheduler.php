@@ -75,11 +75,13 @@
                 $WorkerURL = site_url($WorkerURL);
 
                 $URL = parse_url($WorkerURL);
-                if (ENVIRONMENT == 'production') {
-                    $Port = isset($URL['port']) ? $URL['port'] : 80;
-                } else {
-                    $Port = 9002;
+
+                if (!empty($Worker->custom_host)) {
+                    $CustomURL = parse_url($Worker->custom_host);
+                    isset($CustomURL['host']) ? $URL['host'] = $CustomURL['host'] : null;
+                    isset($CustomURL['port']) ? $URL['port'] = $CustomURL['port'] : null;
                 }
+                $Port = isset($URL['port']) ? $URL['port'] : 80;
 
                 $Socket = $Sockets[$Worker->name] = @fsockopen($URL['host'], $Port, $errno, $errstr, 5);
 
@@ -337,6 +339,13 @@
                   ->name('queuename')
                   ->bindTo($Worker)
                   ->display();
+
+            $Input = new ifx_Input('input', 'text');
+            $Input->placeholder('hostname:port')
+                ->label('Custom Worker Host')
+                ->name('custom_host')
+                ->bindTo($Worker)
+                ->display();
 
             $Input = new ifx_Input('input', 'text');
             $Input->placeholder('time in seconds')

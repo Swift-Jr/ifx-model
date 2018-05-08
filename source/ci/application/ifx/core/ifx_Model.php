@@ -583,7 +583,7 @@ class ifx_Model extends CI_Model
 
                 if (!$thisIsInThat) {
                     //TODO: PRIORITY Candidate for rewrite with relationship exists with
-                    $thatObj->$Alias = $this;
+                    //$thatObj->$Alias = $this;
                     $thatObj->_objects[$Alias][$this->id()] = $this;
                 }
                 return;
