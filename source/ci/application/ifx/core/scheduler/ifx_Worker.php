@@ -121,6 +121,8 @@
 
             $Job->db->set('status', ifx_Job::JOB_STATE_NEW)
                     ->set('worker_id', null)
+                    ->set('retry_count', 'retry_count+1', false)
+                    ->set('run_after', time().' + (retry_count * '.$this->job_retry_time.')', false)
                     ->where_in('status', [ifx_Job::JOB_STATE_QUEUED, ifx_Job::JOB_STATE_RUNNING])
                     ->where('worker_id', $this->id())
                     ->update($Job->_table());
