@@ -124,6 +124,11 @@ module.exports = function (grunt) {
         }
     });
 
+    var testPath = '';
+    if(grunt.option('unitpath')){
+        testPath = grunt.option('unitpath');
+    }
+
     grunt.config('shell', {
         codeignighter : {
             command: 'git clone --branch master https://github.com/bcit-ci/CodeIgniter.git <%=config.ciroot %>',
@@ -135,10 +140,10 @@ module.exports = function (grunt) {
             command: 'git clone --branch master https://github.com/kenjis/ci-phpunit-test.git <%=config.phpunitroot %>',
         },
         tests: {
-            command: 'cd build/application/tests/; phpunit;',
+            command: 'cd build/application/tests/; phpunit '+testPath+';',
         },
         tests_debug: {
-            command: 'cd build/application/tests/; export XDEBUG_CONFIG="remote_host=localhost remote_enable=1 remote_autostart=1"; phpunit;',
+            command: 'cd build/application/tests/; export XDEBUG_CONFIG="remote_host=localhost remote_enable=1 remote_autostart=1"; phpunit '+testPath+';',
         }
     });
 
