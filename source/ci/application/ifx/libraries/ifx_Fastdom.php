@@ -17,6 +17,8 @@ $elements = $dom->find('tag[attr="name"] .class #id') any jQuery selector
         private $source;
         public $url;
 
+        private $directDecendant = false;
+
         public function __construct($html = null, $url = null)
         {
             if (!is_null($html)) {
@@ -39,6 +41,8 @@ $elements = $dom->find('tag[attr="name"] .class #id') any jQuery selector
                 $this->dom->validateOnParse = true;
 
                 if (is_string($html)) {
+                    //$html = mb_convert_encoding($html, 'UTF-8', mb_detect_encoding($html));
+                    //$html = mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8');
                     libxml_use_internal_errors(true);
                     if ($this->dom->loadHTML($html) === false) {
                         libxml_use_internal_errors(false);
@@ -64,9 +68,21 @@ $elements = $dom->find('tag[attr="name"] .class #id') any jQuery selector
         {
             if (!is_array($path)) {
                 $path = explode(' ', preg_replace('/(?:\s\s+|\n|\t)/', ' ', $path));
+                $this->directDecendant = true;
             }
 
-            $xpath = '/';
+            if ($path[0] == '>') {
+                $this->directDecendant = true;
+                if (sizeof($path) > 1) {
+                    array_shift($path);
+                    return $this->_createxPath($path);
+                } else {
+                    return null;
+                }
+            }
+
+            $xpath = $this->directDecendant ? '/' : '//';
+            $this->directDecendant = false;
 
             //Now lets try common stuff
 
@@ -76,13 +92,26 @@ $elements = $dom->find('tag[attr="name"] .class #id') any jQuery selector
 
             $xpath .= empty($match[1]) ? '*' : $match[1];
             $xpath .= $match[2] == '#' ? '[@id' : '';
-            $xpath .= $match[2] == '.' ? '[contains(@class' : '';
-            $xpath .= $match[2] == '.' ? ',' : '';
-            $xpath .= $match[2] != '.' && !empty($match[3]) ? '=' : '';
-            $xpath .= empty($match[3]) ? '' : '"'.$match[3].'"';
+            //   [contains(concat(" ",normalize-space(@class)," ")]
+            //$xpath .= $match[2] == '.' ? '[contains(@class' : '';
+            //$xpath .= $match[2] == '.' ? ',' : '';
+            if ($match[2] == '.') {
+                $Classes = explode('.', $match[3]);
+                for ($classcount = 0;
+                    $classcount < count($Classes);
+                    $classcount++) {
+                    if ($classcount > 0) {
+                        $xpath .= ')]';
+                    }
+                    $xpath .= '[contains(concat(" ",normalize-space(@class)," ")," '.$Classes[$classcount].' "';
+                }
+            } else {
+                $xpath .= $match[2] != '.' && !empty($match[3]) ? '=' : '';
+                $xpath .= empty($match[3]) ? '' : '"'.$match[3].'"';
+            }
             $xpath .= $match[2] == '.' ? ')' : '';
             $xpath .= empty($match[3]) && empty($match[2]) ? '' : ']';
-            $xpath .= empty($match[4]) ? '' : '[@'.$match[4];
+            $xpath .= empty($match[4]) ? '' : '[@'.str_replace('"', '', $match[4]);
             $xpath .= $match[2] != '.' && !empty($match[5]) ? '=' : '';
             $xpath .= empty($match[5]) ? '' : '"'.$match[5].'"';
             $xpath .= empty($match[4]) && empty($match[5]) ? '' : ']';
@@ -122,13 +151,16 @@ $elements = $dom->find('tag[attr="name"] .class #id') any jQuery selector
                 $xpath .= '[last()]';
             }
 
-            //[@attr="value:n3"] - nth
-            $xpath = preg_replace('/(.*):n([0-9]{0,2})(.*)/i', '$1$3[$2]', $xpath);
+            //[@attr="value"]:nth-of-type(x)
+            $xpath = preg_replace('/(.*):nth-of-type\(([0-9]{0,2})\)(.*)/i', '$1$3[$2]', $xpath);
+
+            //[@attr]:nth-child(x)
+            $xpath = preg_replace('/(.*):nth-child\(([0-9]{0,2})\)(.*)/i', '$1$3/*[$2]', $xpath);
 
             //[@attr="value"]:nth - nth
-            if ($match[6] == ':' && $match[8] == 'n' && is_numeric($match[9])) {
-                $xpath .= '['.$match[9].']';
-            }
+            //if ($match[6] == ':' && $match[8] == 'n' && is_numeric($match[9])) {
+            //    $xpath .= '['.$match[9].']';
+            //}
 
             //[@attr="value"]+
             if ($match[6] == '+') {
@@ -166,7 +198,7 @@ $elements = $dom->find('tag[attr="name"] .class #id') any jQuery selector
         public function find($path, $context = null)
         {
             //Break up the path
-
+            $this->directDecendant = true;
             $xpath = $this->_createxPath(strtolower($path));
 
             if (empty($context)) {
@@ -281,7 +313,7 @@ $elements = $dom->find('tag[attr="name"] .class #id') any jQuery selector
         public function text($where = null)
         {
             if (is_null($where)) {
-                return $this->context->textContent;
+                return mb_convert_encoding($this->context->textContent, 'HTML-ENTITIES', 'UTF-8');
             }
 
             $nodes = $this->find($where);
@@ -312,6 +344,10 @@ $elements = $dom->find('tag[attr="name"] .class #id') any jQuery selector
             }
             return false;
             return $this->context->getAttribute($attribute);
+        }
+
+        public function parent()
+        {
         }
 
         public function outerHTML($where = null)
