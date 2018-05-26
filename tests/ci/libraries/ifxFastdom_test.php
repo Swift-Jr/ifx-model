@@ -162,6 +162,11 @@
 
         public function test_xPathGeneration_order_nth_child()
         {
+            $Path = $this->DOM->_createxPath('p:nth-child(6)');
+            $Expected = '/p/*[6]';
+
+            $this->assertEquals($Expected, $Path);
+
             $Path = $this->DOM->_createxPath('ul > li:nth-child(6)');
             $Expected = '/ul/li/*[6]';
 
@@ -172,6 +177,57 @@
         {
             $Path = $this->DOM->_createxPath('ul > li:last-child');
             $Expected = '/ul/li/*[last()]';
+
+            $this->assertEquals($Expected, $Path);
+        }
+
+        public function test_xPathGeneration_contains_text()
+        {
+            $Path = $this->DOM->_createxPath('p:contains("single")');
+            $Expected = '/p[contains(text(), "single")]';
+
+            $this->assertEquals($Expected, $Path);
+
+            $Path = $this->DOM->_createxPath('p:contains("text with spaces")');
+            $Expected = '/p[contains(text(), "text with spaces")]';
+
+            $this->assertEquals($Expected, $Path);
+        }
+
+        public function test_xPathGeneration_combined_selectors()
+        {
+            $Path = $this->DOM->_createxPath('input.highlighted[type="text"]:first');
+            $Expected = '/input[contains(concat(" ",normalize-space(@class)," ")," highlighted ")][@type="text"][1]';
+
+            $this->assertEquals($Expected, $Path);
+
+            $Path = $this->DOM->_createxPath('input.highlighted[type="text"]:nth-of-type(6)');
+            $Expected = '/input[contains(concat(" ",normalize-space(@class)," ")," highlighted ")][@type="text"][6]';
+
+            $this->assertEquals($Expected, $Path);
+
+            $Path = $this->DOM->_createxPath('input.highlighted[type="text"]:last');
+            $Expected = '/input[contains(concat(" ",normalize-space(@class)," ")," highlighted ")][@type="text"][last()]';
+
+            $this->assertEquals($Expected, $Path);
+
+            $Path = $this->DOM->_createxPath('input.highlighted[type="text"]:first-child');
+            $Expected = '/input[contains(concat(" ",normalize-space(@class)," ")," highlighted ")][@type="text"]/*[1]';
+
+            $this->assertEquals($Expected, $Path);
+
+            $Path = $this->DOM->_createxPath('input.highlighted[type="text"]:nth-child(6)');
+            $Expected = '/input[contains(concat(" ",normalize-space(@class)," ")," highlighted ")][@type="text"]/*[6]';
+
+            $this->assertEquals($Expected, $Path);
+
+            $Path = $this->DOM->_createxPath('input.highlighted[type="text"]:last-child');
+            $Expected = '/input[contains(concat(" ",normalize-space(@class)," ")," highlighted ")][@type="text"]/*[last()]';
+
+            $this->assertEquals($Expected, $Path);
+
+            $Path = $this->DOM->_createxPath('input.highlighted[type="text"]:contains("first name")');
+            $Expected = '/input[contains(concat(" ",normalize-space(@class)," ")," highlighted ")][@type="text"][contains(text(), "first name")]';
 
             $this->assertEquals($Expected, $Path);
         }

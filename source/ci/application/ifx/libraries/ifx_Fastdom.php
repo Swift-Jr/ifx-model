@@ -84,19 +84,26 @@ $elements = $dom->find('tag[attr="name"] .class #id') any jQuery selector
             $xpath = $this->directDecendant ? '/' : '//';
             $this->directDecendant = false;
 
-            //Now lets try common stuff
+            //Break up what we've been given
+            //            1             2         3             4                  5                   6        7            8              9              10
+            preg_match('/([^\#\.\[\:]+)?([\#\.]*)?([^\[\:]*)?\[?([^=\]\:]+)?=?["?]?([^"\]\:]*)?["?]?\]?(\+|-|:)?([0-9]{0,2})?([a-zA-Z\-]*)?\(?([0-9]{0,2})?(["a-z\)]*)?/i', $path[0], $match);
 
-            //Clean up first - clean up from #id .class [attr] through to div#id[attr="value"]
-            //preg_match('/([^\#\.\[]+)?([\#\.]*)?([^\[]*)?\[?([^=\]]+)?=?[\"?]?([^"\]]*)?[\"?]?\]?/', $path[0], $match);
-            preg_match('/([^\#\.\[]+)?([\#\.]*)?([^\[]*)?\[?([^=\]]+)?=?[\"?]?([^"\]]*)?[\"?]?\]?(\+|-)?([0-9]{0,2})?([a-zA-Z]*)?([0-9]{0,2})?/i', $path[0], $match);
+            $Element = $match[1]; //p, div etc
+            $ClassOrID = $match[2]; //. or #
+            $ClassIDName = $match[3]; //classname or elementid
+            $AttrName = $match[4]; //type, data-attr etc
+            $AttrValue = $match[5]; //submit, attrvalue etc
+            $Operator = $match[6]; //+, -, :
+            $OperatorInt = $match[7]; //Not working - should support el+4 or el-4
+            $OperatorFunction = $match[8]; //last-child, first-child etc
+            $OperatorFunctionValue = $match[9]; //for operator(n) the value of nth-child
+            $ContainsValue = $match[10]; //for contains operator
 
-            $xpath .= empty($match[1]) ? '*' : $match[1];
-            $xpath .= $match[2] == '#' ? '[@id' : '';
-            //   [contains(concat(" ",normalize-space(@class)," ")]
-            //$xpath .= $match[2] == '.' ? '[contains(@class' : '';
-            //$xpath .= $match[2] == '.' ? ',' : '';
-            if ($match[2] == '.') {
-                $Classes = explode('.', $match[3]);
+            $xpath .= empty($Element) ? '*' : $Element;
+            $xpath .= $ClassOrID == '#' ? '[@id' : '';
+
+            if ($ClassOrID == '.') {
+                $Classes = explode('.', $ClassIDName);
                 for ($classcount = 0;
                     $classcount < count($Classes);
                     $classcount++) {
@@ -106,77 +113,93 @@ $elements = $dom->find('tag[attr="name"] .class #id') any jQuery selector
                     $xpath .= '[contains(concat(" ",normalize-space(@class)," ")," '.$Classes[$classcount].' "';
                 }
             } else {
-                $xpath .= $match[2] != '.' && !empty($match[3]) ? '=' : '';
-                $xpath .= empty($match[3]) ? '' : '"'.$match[3].'"';
+                $xpath .= $ClassOrID != '.' && !empty($ClassIDName) ? '=' : '';
+                $xpath .= empty($ClassIDName) ? '' : '"'.$ClassIDName.'"';
             }
-            $xpath .= $match[2] == '.' ? ')' : '';
-            $xpath .= empty($match[3]) && empty($match[2]) ? '' : ']';
-            $xpath .= empty($match[4]) ? '' : '[@'.str_replace('"', '', $match[4]);
-            $xpath .= $match[2] != '.' && !empty($match[5]) ? '=' : '';
-            $xpath .= empty($match[5]) ? '' : '"'.$match[5].'"';
-            $xpath .= empty($match[4]) && empty($match[5]) ? '' : ']';
+
+            $xpath .= $ClassOrID == '.' ? ')' : '';
+            $xpath .= empty($ClassIDName) && empty($ClassOrID) ? '' : ']';
+            $xpath .= empty($AttrName) ? '' : '[@'.str_replace('"', '', $AttrName);
+            $xpath .= !empty($AttrName) && !empty($AttrValue) ? '=' : '';
+            $xpath .= empty($AttrValue) ? '' : '"'.$AttrValue.'"';
+            $xpath .= empty($AttrName) && empty($AttrValue) ? '' : ']';
 
             //If its an ID, make it so
             $xpath = preg_replace('/(.*)#(.*)/i', '$1[@id="$2"]', $xpath);
 
-            //[@attr="value:first-child"] - first child
-            $xpath = preg_replace('/(.*)(:first-child)(.*)/i', '$1$3/*[1]', $xpath);
+            if ($Operator == ':') {
+                switch ($OperatorFunction) {
+                    //[@attr="value"]:first-child - first child
+                    case 'first-child':
+                        $xpath .= '/*[1]';
+                    break;
 
-            //[@attr="value"]:first-child - first child
-            if ($match[6] == ':' && $match[8] == 'first-child') {
-                $xpath .= '/*[1]';
+                    //[@attr="value"]:last-child - last child
+                    case 'last-child':
+                        $xpath .= '/*[last()]';
+                    break;
+
+                    //[@attr="value"]:first - first
+                    case 'first':
+                        $xpath .= '[1]';
+                    break;
+
+                    //[@attr="value"]:last - last
+                    case 'last':
+                        $xpath .= '[last()]';
+                    break;
+
+                    //[@attr="value"]:nth-of-type(x)
+                    case 'nth-of-type':
+                        if (is_numeric($OperatorFunctionValue)) {
+                            $xpath .= '['.$OperatorFunctionValue.']';
+                        }
+                    break;
+
+                    //[@attr="value"]:nth-child(x)
+                    case 'nth-child':
+                        if (is_numeric($OperatorFunctionValue)) {
+                            $xpath .= '/*['.$OperatorFunctionValue.']';
+                        }
+                    break;
+
+                    //el:contains("some text")
+                    case 'contains':
+                        if (is_string($ContainsValue)) {
+                            $xpath .= '[contains(text(), '.$ContainsValue;
+
+                            array_shift($path);
+
+                            while (isset($path[0]) && $path[0][-1] != ')' && $xpath[-1] != ')') {
+                                $xpath .= ' '.array_shift($path);
+                            }
+
+                            if (isset($path[0])) {
+                                $xpath .= ' '.$path[0];
+                            }
+
+                            $xpath .= ']';
+                        }
+                    break;
+                }
             }
 
-            //[@attr="value:last-child"] - last child
-            $xpath = preg_replace('/(.*)(:last-child)(.*)/i', '$1$3/*[last()]', $xpath);
-
-            //[@attr="value"]:last-child - last child
-            if ($match[6] == ':' && $match[8] == 'last-child') {
-                $xpath .= '/*[last()]';
-            }
-
-            //[@attr="value:first"] - first
-            $xpath = preg_replace('/(.*)(:first)(.*)/i', '$1$3[1]', $xpath);
-
-            //[@attr="value"]:first - first
-            if ($match[6] == ':' && $match[8] == 'first') {
-                $xpath .= '[1]';
-            }
-
-            //[@attr="value:last"] - last
-            $xpath = preg_replace('/(.*)(:last)(.*)/i', '$1$3[last()]', $xpath);
-
-            //[@attr="value"]:last - last
-            if ($match[6] == ':' && $match[8] == 'last') {
-                $xpath .= '[last()]';
-            }
-
-            //[@attr="value"]:nth-of-type(x)
-            $xpath = preg_replace('/(.*):nth-of-type\(([0-9]{0,2})\)(.*)/i', '$1$3[$2]', $xpath);
-
-            //[@attr]:nth-child(x)
-            $xpath = preg_replace('/(.*):nth-child\(([0-9]{0,2})\)(.*)/i', '$1$3/*[$2]', $xpath);
-
-            //[@attr="value"]:nth - nth
-            //if ($match[6] == ':' && $match[8] == 'n' && is_numeric($match[9])) {
-            //    $xpath .= '['.$match[9].']';
-            //}
-
+            //This does not work - will need rewriting to work like >
             //[@attr="value"]+
-            if ($match[6] == '+') {
-                $node = (strlen(trim($match[8])) > 0 ? $match[8]:'*');
+            if ($Operator == '+') {
+                $node = (strlen(trim($OperatorFunction)) > 0 ? $OperatorFunction:'*');
                 $xpath .= '/following-sibling::'.$node;
             }
 
             //[@attr="value"]-
-            if ($match[6] == '-') {
-                $node = (strlen(trim($match[8])) > 0 ? $match[8]:'*');
+            if ($Operator == '-') {
+                $node = (strlen(trim($OperatorFunction)) > 0 ? $OperatorFunction:'*');
                 $xpath .= '/preceding-sibling::'.$node;
             }
 
             //[@attr="value"]+/-n - next n sibling
-            if ($match[6] == '-' || $match[6] == '+' and is_numeric($match[7])) {
-                $xpath .= '['.$match[7].']';
+            if ($Operator == '-' || $Operator == '+' and is_numeric($OperatorInt)) {
+                $xpath .= '['.$OperatorInt.']';
             }
 
             if (sizeof($path) > 1) {
