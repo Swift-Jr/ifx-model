@@ -1,6 +1,8 @@
 <?php
 
-require(APPPATH.'/ifx/init.php');
+if (!defined('IFXPATH')) {
+    require(APPPATH.'/ifx/init.php');
+}
 
 class mChild extends ifx_Model
 {

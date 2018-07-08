@@ -12,7 +12,8 @@ class ifx_Autoloader
         'core',
         'core/database',
         'models',
-        'libraries'
+        'libraries',
+        'traits'
     );
 
     public function __construct()
