@@ -855,6 +855,12 @@ class ifx_Model extends CI_Model
         if (sizeof($this->all()) > 0) {
             return sizeof($this->all());
         } else {
+            foreach ($this->_data as $Key=>$Value) {
+                //Escape special fieldnames
+                $Escape = array('order', 'group');
+                !in_array($Key, $Escape) or $Key = '`'.$Key.'`';
+                $this->db->where($Key, $Value, !is_a_number($Value));
+            }
             $this->db->from($this->_table());
             return (int) $this->db->count_all_results();
         }

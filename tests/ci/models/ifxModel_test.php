@@ -763,6 +763,13 @@ class ifxModel_test extends TestCase
         $this->assertSame(2, $Parent->count());
     }
 
+    public function test_count_query()
+    {
+        $City = new mCity();
+        $City->name = 'Brighton';
+        $this->assertSame(1, $City->count());
+    }
+
     public function test_sum()
     {
         $Parent = new mParent();
