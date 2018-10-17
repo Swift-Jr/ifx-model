@@ -4,14 +4,16 @@ class ifx_Autoloader
     private $_ci_paths = array(
         'core',
         'libraries',
-        'models'
+        'models',
+        'jobs'
     );
 
     private $_ifx_paths = array(
         'core',
         'core/database',
         'models',
-        'libraries'
+        'libraries',
+        'traits'
     );
 
     public function __construct()

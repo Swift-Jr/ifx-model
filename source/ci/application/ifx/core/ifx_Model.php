@@ -79,7 +79,7 @@ class ifx_Model extends CI_Model
         }
 
         //Passed something to load?
-        if (is_numeric($Object) || is_object($Object)) {
+        if (is_a_number($Object) || is_object($Object)) {
             $this->load($Object);
         }
     }
@@ -102,7 +102,7 @@ class ifx_Model extends CI_Model
     final public function sanitizeRelationships(&$Relationships)
     {
         foreach ($Relationships as $Alias => $ToOne) {
-            if (is_numeric($Alias)) {
+            if (is_a_number($Alias)) {
                 //The ToOne is just a name e.g. object
 
                 //Decode the object into a relationship
@@ -113,8 +113,12 @@ class ifx_Model extends CI_Model
                     $Field = $Relation->_id();
                 } elseif ($Relation->field_exists($this->_id())) {
                     $Field = $this->_id();
+                } elseif ($this->table_exists($this->_table().'_'.$Relation->_table()) ||
+                            $this->table_exists($Relation->_table().'_'.$this->_table())) {
+                    //3NF
+                    $Field = null;
                 } else {
-                    throw new Exception("It doesn't look like there's a foreign key between ($ToOne) and (".get_class($this).")");
+                    throw new Exception("It doesn't look like there's a foreign key between ($mObject) and (".get_class($this).")");
                 }
 
                 $Relationships[$ToOne] = [$mObject, $Field];
@@ -358,11 +362,13 @@ class ifx_Model extends CI_Model
         //Check relationships
         if (isset($this->has_one[$name]) /*&& isset($this->_objects[$name])*/) {
             //if ($this->is_loaded()) {
+            ////TODO: PRIORITY Candidate for rewrite with relationship exists with
             $Model = $this->$name;
             return is_subclass_of($Model, get_class(new self()));
         }
 
         if (isset($this->has_many[$name]) /*&& isset($this->_objects[$name])*/) {
+            //TODO: PRIORITY Candidate for rewrite with relationship exists with
             return count($this->$name) > 0;
         }
 
@@ -435,6 +441,8 @@ class ifx_Model extends CI_Model
 
     public function __set($name, $value)
     {
+        $value = convert_if_numerical($value);
+
         //Make sure its not an attempt to override the ID
         if ($name == $this->_id() && $this->is_loaded()) {
             throw new Exception("Trying to override the ID of a loaded object");
@@ -452,7 +460,7 @@ class ifx_Model extends CI_Model
 
         //See if the name is a relation alias
         if (isset($this->has_one[$name])) {
-            if (is_numeric($value) && !is_null($value)) {
+            if (is_a_number($value) && !is_null($value)) {
                 list($Alias, $Model, $Form, $Field, $Table, $Location) = $this->decode($name);
                 $this->_objects[$name] = new $Model($value);
                 switch ($Location) {
@@ -476,9 +484,12 @@ class ifx_Model extends CI_Model
                 list($Alias, $Model, $Form, $Field, $Table, $Location) = $this->decode($name);
                 switch ($Location) {
                     case 'LOCAL':
-                        if ($this->_data[$Field] != $value) {
-                            $this->_affected_fields[$Field] = $this->_data[$Field];
-                        }
+                      if (!isset($this->_data[$Field])) {
+                          $this->_data[$Field] = null;
+                      }
+                      if ($this->_data[$Field] != $value) {
+                          $this->_affected_fields[$Field] = $this->_data[$Field];
+                      }
                         $this->_data[$Field] = null;
                     break;
                     case 'REMOTE':
@@ -496,6 +507,7 @@ class ifx_Model extends CI_Model
 
         if (isset($this->has_many[$name])) {
             //See if this already exists as a child
+            //TODO: Candidate for rewrite with relationship exists with
             $found = !isset($this->$name) ? [] : array_filter($this->$name, static function ($model) use ($value) {
                 return $model == $value or $model->is_loaded() && $value->is_loaded() && $model->id() == $value->id();
             });
@@ -550,6 +562,7 @@ class ifx_Model extends CI_Model
             list($Model, $Key) = $Relation;
             if (strtolower($Model) == strtolower(get_class($this))) {
                 //check if $this is already referenced or not (avoid infinite loop)
+                //TODO: Candidate for rewrite with relationship exists with
                 if (!isset($thatObj->$Alias)
                     or $thatObj->$Alias->id() != $this->id() && $thatObj->$Alias != $this) {
                     $thatObj->$Alias = $this;
@@ -558,17 +571,19 @@ class ifx_Model extends CI_Model
                 return;
             }
         }
+        //Check each many type of relationship for the foreigh object
         foreach ($thatObj->has_many as $Alias => $Relation) {
             list($Model, $Key) = $Relation;
+            //If the foreign object supports links to this
             if (strtolower($Model) == strtolower(get_class($this))) {
                 $thisIsInThat = false;
-                foreach ($thatObj->$Alias as $fObject) {
-                    if ($fObject->id() == $this->id() || $fObject == $this) {
-                        $thisIsInThat = true;
-                    }
-                }
+
+                //See if this object exists linked to thatObj
+                $thisIsInThat = $thatObj->relationship_exists_with($this);
+
                 if (!$thisIsInThat) {
-                    $thatObj->$Alias = $this;
+                    //TODO: PRIORITY Candidate for rewrite with relationship exists with
+                    //$thatObj->$Alias = $this;
                     $thatObj->_objects[$Alias][$this->id()] = $this;
                 }
                 return;
@@ -590,7 +605,101 @@ class ifx_Model extends CI_Model
         }
 
         if (isset($this->has_many[$Alias])) {
-            $this->_objects[$Alias][$thatObj->id()] = $thatObj;
+            if ($thatObj->is_loaded()) {
+                $this->_objects[$Alias][$thatObj->id()] = $thatObj;
+            } else {
+                $found = false;
+                foreach ($this->_objects[$Alias] as $foreignObject) {
+                    if ($foreignObject == $thatObj) {
+                        $found = true;
+                        continue;
+                    }
+                }
+                if (!$found) {
+                    $this->_objects[$Alias][] = $thatObj;
+                }
+            }
+        }
+    }
+
+    /**
+     * Given the $Object, see if a pre-exisitng relationship exists
+     * @param  ifx_Model $Object  [description]
+     * @return bool               [description]
+     */
+    final public function relationship_exists_with(ifx_Model $Object, $Unsaved = true)
+    {
+        if (!$Object->is_loaded() && !$Unsaved) {
+            return false;
+        }
+
+        if ($Unsaved) {
+            list($Alias, $ModelType, $Form) = $this->decode($Object);
+
+            if (isset($this->_objects[$Alias])) {
+                switch ($Form) {
+                    case 1:
+                        if ($this->_objects[$Alias] == $Object) {
+                            return true;
+                        }
+                    break;
+                    case 2:
+                    case 3:
+                        foreach ($this->_objects[$Alias] as $fObject) {
+                            if ($fObject == $Object) {
+                                return true;
+                            }
+                        }
+                    break;
+                    default:
+                        throw new Exception('Unsupported $Form');
+                }
+            }
+        }
+
+        list($Form, $Field, $Table, $Location) = $this->decodeRelationship($Object);
+
+        switch ($Form) {
+            case 1:
+                $Test = new static($this->id());
+                return $Test->$Field == $Object->id();
+            break;
+
+            case 2:
+                switch ($Location) {
+                    case 'LOCAL':
+                        $Test = new static();
+                        $Test->$Field = $Object->id();
+                        $Test->db->where($this->_id(), $this->id());
+                        return $Test->load();
+                    break;
+
+                    case 'REMOTE':
+                        $ModelType = get_class($Object);
+                        $Test = new $ModelType();
+                        $Test->$Field = $this->id();
+                        $Test->db->where($Object->_id(), $Object->id());
+                        return $Test->load();
+                    break;
+
+                    default:
+                        throw new Exception("$Location is an unknown field location. Expected LOCAL or REMOTE");
+                }
+            break;
+
+            case 3:
+                $Test = new static();
+                $Result = $Test->db
+                  ->where($this->_id(), $this->id())
+                  ->where($Object->_id(), $Object->id())
+                  ->get($Table);
+
+
+                return $Result->num_rows() == 1;
+            break;
+
+            default:
+                throw new Exception("Unsupport form ($Form) for relationship ($Table)");
         }
     }
 
@@ -961,13 +1070,7 @@ class ifx_Model extends CI_Model
         $this->_isnew = false;
 
         foreach ($DBRow as $Key=>$Value) {
-            if (is_numeric($Value)) {
-                if (intval($Value) == $Value) {
-                    $Value = intval($Value);
-                } else {
-                    $Value = floatval($Value);
-                }
-            }
+            $Value = convert_if_numerical($Value);
 
             if ($this->flatten_results) {
                 $KeyParts = explode('.', $Key);
@@ -1007,7 +1110,7 @@ class ifx_Model extends CI_Model
                 $Escape = array('order', 'group');
                 !in_array($Key, $Escape) or $Key = '`'.$Key.'`';
 
-                $this->db->set($Key, $Value, !is_numeric($Value));
+                $this->db->set($Key, $Value, !is_a_number($Value));
             }
         }
     }
@@ -1081,8 +1184,8 @@ class ifx_Model extends CI_Model
         }
 
         //Did the user request via a specific ID?
-        if (is_numeric($ID)) {
-            $this->db->where($this->_id(), $ID);
+        if (is_a_number($ID)) {
+            $this->db->where($this->_id(), convert_if_numerical($ID), false);
         }
 
         //Are there any variables set in the object to be used in the query?
@@ -1186,6 +1289,12 @@ class ifx_Model extends CI_Model
         } elseif ($this->is_loaded()) {
             //We only allow deletes for a loaded record, to avoid whole table deletes
             $this->db->where($this->_id(), $this->id());
+            $this->db->delete($this->_table());
+        } elseif (!$this->is_loaded() && count($this->_data) > 0) {
+            //We only allow deletes for a loaded record, to avoid whole table deletes
+            foreach ($this->_data as $Field=>$Value) {
+                $this->db->where($Field, $Value);
+            }
             $this->db->delete($this->_table());
         }
 
@@ -1828,6 +1937,7 @@ class ifx_Model extends CI_Model
                 foreach ($Objects as $TargetAlias) {
                     $NextSet = [];
                     foreach ($Return as $Collection) {
+                        //TODO: POSSIBLE Candidate for rewrite with relationship exists with
                         $Target = $Collection->$TargetAlias;
                         if (is_array($Target)) {
                             foreach ($Target as $Many) {
@@ -1887,4 +1997,58 @@ class ifx_Model extends CI_Model
 function unix_to_mysql($timestamp)
 {
     return date("Y-m-d H:i:s", $timestamp);
+}
+
+/**
+ * Given a $Value detect if it is a valid integer or float value, ignoring exponent conversions
+ * @param  mixed  $Value Representation of a number
+ * @return boolean       If $Value is a valid INT or Float value
+ */
+ function is_a_number($Value)
+ {
+     switch (gettype($Value)) {
+         case 'object':
+         case 'array':
+         case 'resource':
+         case 'boolean':
+             return false;
+         break;
+         default:
+             if (is_numeric($Value) && !preg_match('/[0-9]*\.[0-9]*e[0-9]*/', $Value)) {
+                 if (intval($Value) == $Value) {
+                     return true;
+                 } elseif (floatval($Value) == $Value) {
+                     return true;
+                 }
+             }
+     }
+
+     return false;
+ }
+
+/**
+ * Convert $Value into an int or float if its a valid numerical string
+ * @param  mixed $Value Representation of a number
+ * @return mixed        String, Int, Float
+ */
+function convert_if_numerical($Value)
+{
+    switch (gettype($Value)) {
+        case 'object':
+        case 'array':
+        case 'resource':
+        case 'boolean':
+            return $Value;
+        break;
+        default:
+            if (is_numeric($Value) && !preg_match('/[0-9]*\.[0-9]*e[0-9]*/', $Value)) {
+                if (intval($Value) == $Value) {
+                    $Value = intval($Value);
+                } elseif (floatval($Value) == $Value) {
+                    $Value = floatval($Value);
+                }
+            }
+    }
+
+    return $Value;
 }

@@ -3,12 +3,22 @@
 //SampleJob::create($Params, $QueueName);
 //SampleJob::create_at($Timestamp, $Params, $QueueName);
 
+    function exception_error_handler($severity, $message, $file, $line)
+    {
+        if (!(error_reporting() & $severity)) {
+            // This error code is not included in error_reporting
+            //return;
+        }
+        throw new Exception($file.':'.$line.' -> '.$message);
+    }
+
     class ifx_Worker extends ifx_Model
     {
         const ifx_worker_id = 'worker_id';
 
         const WORKER_STATE_READY = 1;
         const WORKER_STATE_BUSY = 2;
+        const WORKER_STATE_SLEEPING = 3;
         const WORKER_STATE_INACTIVE = 0;
 
         public function enable()
@@ -111,6 +121,8 @@
 
             $Job->db->set('status', ifx_Job::JOB_STATE_NEW)
                     ->set('worker_id', null)
+                    ->set('retry_count', 'retry_count+1', false)
+                    ->set('run_after', time().' + (retry_count * '.$this->job_retry_time.')', false)
                     ->where_in('status', [ifx_Job::JOB_STATE_QUEUED, ifx_Job::JOB_STATE_RUNNING])
                     ->where('worker_id', $this->id())
                     ->update($Job->_table());
@@ -135,6 +147,8 @@
 
                 ifx_Scheduler_History::create('WORKER', $this->id(), $this->name. ' worker processing started with id:'.$this->process_id, $this->_data);
             }
+            set_exception_handler(null);
+            set_error_handler('exception_error_handler');
 
             while (true) {
                 //$this->refresh();
@@ -148,11 +162,13 @@
 
                 $time = time();
                 $memory_usage = memory_get_usage();
+                $memory_usage_max = memory_get_peak_usage();
 
                 //If the worker looks likes its already running, abort
                 $query = $this->db->set('status', self::WORKER_STATE_BUSY)
                         ->set('last_updated', $time)
                         ->set('memory_usage', $memory_usage)
+                        ->set('memory_usage_max', $memory_usage_max)
                         ->where($this->_id(), $this->id())
                         ->where('enabled', true)
                         ->where('status', self::WORKER_STATE_READY)
@@ -168,6 +184,7 @@
                     $this->status = self::WORKER_STATE_BUSY;
                     $this->last_updated = $time;
                     $this->memory_usage = $memory_usage;
+                    $this->memory_usage_max = $memory_usage_max;
                 }
 
                 //Fetch next job
@@ -178,6 +195,8 @@
                     ifx_Scheduler_History::create('WORKER', $this->id(), $this->name. ' worker processing job:'.$Job->id, $Job->_data);
 
                     try {
+                        $jobstarttime = time();
+
                         if ($Job->begin()) {
                             ifx_Scheduler_History::create('WORKER', $this->id(), $this->name. ' worker completed job:'.$Job->id, $Job->_data);
                             $Job->complete();
@@ -185,22 +204,36 @@
                             ifx_Scheduler_History::create('WORKER', $this->id(), $this->name. ' worker processing job failed:'.$Job->id, $Job->_data);
                             $Job->failed();
                         }
-                    } catch (Exception $e) {
+                    } catch (Throwable $Thrown) {
+                        switch (gettype($Thrown)) {
+                            default:
+                                $Error['message'] = gettype($Thrown).': '.$Thrown->getMessage();
+                                $Error['file'] = $Thrown->getFile().':'.$Thrown->getLine();
+                                $Error['trace'] = $Thrown->getTraceAsString();
+                        }
                         //Failed, record the error
-                        ifx_Scheduler_History::create('WORKER', $this->id(), $this->name. ' worker processing job failed:'.$Job->id, $Job->_data);
+
+                        $Return = array_merge($Error, $Job->_data);
+
+                        ifx_Scheduler_History::create('WORKER', $this->id(), $this->name. ' worker processing job failed:'.$Job->id, $Return);
                         $Job->failed();
                     }
+                    gc_collect_cycles();
 
-                    $waittime = time() - $time - $this->wait_between_jobs_starting;
+                    $jobtotaltime = $jobstarttime - time();
 
-                    if ($waittime > 0) {
+                    if ($jobtotaltime > $this->wait_between_jobs_starting) {
+                        $waittime = $this->wait_between_jobs_starting - $jobtotaltime;
+
                         sleep($waittime);
                     }
                 } else {
-                    ifx_Scheduler_History::create('WORKER', $this->id(), $this->name. ' worker sleeping', $this->_data);
-
                     //Fixup any lost jobs
                     $this->recover_lost_jobs();
+                    $this->db->set('status', self::WORKER_STATE_SLEEPING)
+                        ->where($this->_id(), $this->id())
+                        ->where('process_id', $this->process_id)
+                        ->update($this->_table());
                     sleep($this->wait_no_job_available);
                 }
 

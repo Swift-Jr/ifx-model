@@ -3,6 +3,8 @@
     class ifx_CURL extends ifx_Library
     {
         private $url = null;
+        public $info = [];
+        
         private $CURL_OPT = [
             CURLOPT_FOLLOWLOCATION => true
         ];
@@ -42,7 +44,7 @@
 
             $return = curl_exec($curl);
 
-            $info = curl_getinfo($curl);
+            $this->info = curl_getinfo($curl);
 
             curl_close($curl);
 

@@ -20,7 +20,9 @@
         {
             parent::__construct();
             $this->_table('ifx_job');
-            $this->load($ID);
+            if (!is_null($ID)) {
+                $this->load($ID);
+            }
             $this->worker = $Worker;
         }
 
@@ -61,6 +63,7 @@
             $Job->load();
 
             static::load_job_handeler($Job->name, $Worker);
+            $Object = $Job->name;
 
             $Job = new $Object($Job->id());
 
@@ -77,6 +80,10 @@
 
         public static function load_job_handeler($HandelerName, $Worker = null)
         {
+            if (class_exists($HandelerName)) {
+                return true;
+            }
+
             if (is_null($Worker)) {
                 $Worker = new ifx_Worker();
             }
@@ -110,7 +117,7 @@
 
         public function store_message($message)
         {
-            if (SCHEDULER_DEBUG_MODE) {
+            if (defined('SCHEDULER_DEBUG_MODE')) {
                 print_r($message.'<br />');
                 return true;
             }

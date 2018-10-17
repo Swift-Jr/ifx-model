@@ -6,7 +6,8 @@ $dom->load($rawhtmldata);
 $elements = $dom->find('tag[attr="name"] .class #id') any jQuery selector
 
 ***/
-    class ifx_Fastdom{
+    class ifx_Fastdom
+    {
         public $fetch = array();
 
         protected $styles = null;
@@ -16,28 +17,46 @@ $elements = $dom->find('tag[attr="name"] .class #id') any jQuery selector
         private $source;
         public $url;
 
-        function __construct($html = null, $url = null){
-            if(!is_null($html)) $this->load($html, $url);
+        private $directDecendant = false;
+
+        public function __construct($html = null, $url = null)
+        {
+            if (!is_null($html)) {
+                $this->load($html, $url);
+            }
         }
 
-        function load($html = null, $url = null){
-            if(is_null($html)) return false;
+        public function load($html = null, $url = null)
+        {
+            if (is_null($html)) {
+                return false;
+            }
 
             $this->url = $url;
 
-            if($html instanceof DOMDocument){
+            if ($html instanceof DOMDocument) {
                 $this->dom = $html;
-            }else{
+            } else {
                 $this->dom = new DOMDocument();
                 $this->dom->validateOnParse = true;
-                if(is_string($html)) if(@$this->dom->loadHTML($html) === false) return false;
+
+                if (is_string($html)) {
+                    //$html = mb_convert_encoding($html, 'UTF-8', mb_detect_encoding($html));
+                    //$html = mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8');
+                    libxml_use_internal_errors(true);
+                    if ($this->dom->loadHTML($html) === false) {
+                        libxml_use_internal_errors(false);
+                        return false;
+                    }
+                    libxml_use_internal_errors(false);
+                }
             }
 
             $this->source = $html;
             $this->dom->preserveWhiteSpace = false;
 
-            if(isset($this->fetch) && is_array($this->fetch) && sizeof($this->fetch) > 0){
-                foreach($this->fetch as $var => $path){
+            if (isset($this->fetch) && is_array($this->fetch) && sizeof($this->fetch) > 0) {
+                foreach ($this->fetch as $var => $path) {
                     $this->$var = $this->find($path);
                 }
             }
@@ -45,96 +64,148 @@ $elements = $dom->find('tag[attr="name"] .class #id') any jQuery selector
             return true;
         }
 
-        function _createxPath($path){
-            if(!is_array($path)) {
-                $path = explode(' ', preg_replace('/(?:\s\s+|\n|\t)/', ' ',$path));
+        public function _createxPath($path)
+        {
+            if (!is_array($path)) {
+                $path = explode(' ', preg_replace('/(?:\s\s+|\n|\t)/', ' ', $path));
+                $this->directDecendant = true;
             }
 
-            $xpath = '/';
+            if ($path[0] == '>') {
+                $this->directDecendant = true;
+                if (sizeof($path) > 1) {
+                    array_shift($path);
+                    return $this->_createxPath($path);
+                } else {
+                    return null;
+                }
+            }
 
-            //Now lets try common stuff
+            $xpath = $this->directDecendant ? '/' : '//';
+            $this->directDecendant = false;
 
-            //Clean up first - clean up from #id .class [attr] through to div#id[attr="value"]
-            //preg_match('/([^\#\.\[]+)?([\#\.]*)?([^\[]*)?\[?([^=\]]+)?=?[\"?]?([^"\]]*)?[\"?]?\]?/', $path[0], $match);
-            preg_match('/([^\#\.\[]+)?([\#\.]*)?([^\[]*)?\[?([^=\]]+)?=?[\"?]?([^"\]]*)?[\"?]?\]?(\+|-)?([0-9]{0,2})?([a-zA-Z]*)?([0-9]{0,2})?/i', $path[0], $match);
+            //Break up what we've been given
+            //            1             2         3             4                  5                   6        7            8              9              10
+            preg_match('/([^\#\.\[\:]+)?([\#\.]*)?([^\[\:]*)?\[?([^=\]\:]+)?=?["?]?([^"\]\:]*)?["?]?\]?(\+|-|:)?([0-9]{0,2})?([a-zA-Z\-]*)?\(?([0-9]{0,2})?(.*)?/i', $path[0], $match);
 
-            $xpath .= empty($match[1]) ? '*' : $match[1];
-            $xpath .= $match[2] == '#' ? '[@id' : '';
-            $xpath .= $match[2] == '.' ? '[contains(@class' : '';
-            $xpath .= $match[2] == '.' ? ',' : '';
-            $xpath .= $match[2] != '.' && !empty($match[3]) ? '=' : '';
-            $xpath .= empty($match[3]) ? '' : '"'.$match[3].'"';
-            $xpath .= $match[2] == '.' ? ')' : '';
-            $xpath .= empty($match[3]) && empty($match[2]) ? '' : ']';
-            $xpath .= empty($match[4]) ? '' : '[@'.$match[4];
-            $xpath .= $match[2] != '.' && !empty($match[5]) ? '=' : '';
-            $xpath .= empty($match[5]) ? '' : '"'.$match[5].'"';
-            $xpath .= empty($match[4]) && empty($match[5]) ? '' : ']';
+            $Element = $match[1]; //p, div etc
+            $ClassOrID = $match[2]; //. or #
+            $ClassIDName = $match[3]; //classname or elementid
+            $AttrName = $match[4]; //type, data-attr etc
+            $AttrValue = $match[5]; //submit, attrvalue etc
+            $Operator = $match[6]; //+, -, :
+            $OperatorInt = $match[7]; //Not working - should support el+4 or el-4
+            $OperatorFunction = $match[8]; //last-child, first-child etc
+            $OperatorFunctionValue = $match[9]; //for operator(n) the value of nth-child
+            $ContainsValue = $match[10]; //for contains operator
+
+            $xpath .= empty($Element) ? '*' : $Element;
+            $xpath .= $ClassOrID == '#' ? '[@id' : '';
+
+            if ($ClassOrID == '.') {
+                $Classes = explode('.', $ClassIDName);
+                for ($classcount = 0;
+                    $classcount < count($Classes);
+                    $classcount++) {
+                    if ($classcount > 0) {
+                        $xpath .= ')]';
+                    }
+                    $xpath .= '[contains(concat(" ",normalize-space(@class)," ")," '.$Classes[$classcount].' "';
+                }
+            } else {
+                $xpath .= $ClassOrID != '.' && !empty($ClassIDName) ? '=' : '';
+                $xpath .= empty($ClassIDName) ? '' : '"'.$ClassIDName.'"';
+            }
+
+            $xpath .= $ClassOrID == '.' ? ')' : '';
+            $xpath .= empty($ClassIDName) && empty($ClassOrID) ? '' : ']';
+            $xpath .= empty($AttrName) ? '' : '[@'.str_replace('"', '', $AttrName);
+            $xpath .= !empty($AttrName) && !empty($AttrValue) ? '=' : '';
+            $xpath .= empty($AttrValue) ? '' : '"'.$AttrValue.'"';
+            $xpath .= empty($AttrName) && empty($AttrValue) ? '' : ']';
 
             //If its an ID, make it so
             $xpath = preg_replace('/(.*)#(.*)/i', '$1[@id="$2"]', $xpath);
 
-            //[@attr="value:first-child"] - first child
-            $xpath = preg_replace('/(.*)(:first-child)(.*)/i', '$1$3/*[1]', $xpath);
+            if ($Operator == ':') {
+                switch ($OperatorFunction) {
+                    //[@attr="value"]:first-child - first child
+                    case 'first-child':
+                        $xpath .= '/*[1]';
+                    break;
 
-            //[@attr="value"]:first-child - first child
-            if($match[6] == ':' && $match[8] == 'first-child'){
-                $xpath .= '/*[1]';
+                    //[@attr="value"]:last-child - last child
+                    case 'last-child':
+                        $xpath .= '/*[last()]';
+                    break;
+
+                    //[@attr="value"]:first - first
+                    case 'first':
+                        $xpath .= '[1]';
+                    break;
+
+                    //[@attr="value"]:last - last
+                    case 'last':
+                        $xpath .= '[last()]';
+                    break;
+
+                    //[@attr="value"]:nth-of-type(x)
+                    case 'nth-of-type':
+                        if (is_numeric($OperatorFunctionValue)) {
+                            $xpath .= '['.$OperatorFunctionValue.']';
+                        }
+                    break;
+
+                    //[@attr="value"]:nth-child(x)
+                    case 'nth-child':
+                        if (is_numeric($OperatorFunctionValue)) {
+                            $xpath .= '/*['.$OperatorFunctionValue.']';
+                        }
+                    break;
+
+                    //el:contains("some text")
+                    case 'contains':
+                        if (is_string($ContainsValue)) {
+                            $xpath .= '[contains(text(), '.$ContainsValue;
+
+                            array_shift($path);
+
+                            while (isset($path[0]) && $path[0][-1] != ')' && $xpath[-1] != ')') {
+                                $xpath .= ' '.array_shift($path);
+                            }
+
+                            if (isset($path[0])) {
+                                $xpath .= ' '.$path[0];
+                            }
+
+                            $xpath .= ']';
+                        }
+                    break;
+                }
             }
 
-            //[@attr="value:last-child"] - last child
-            $xpath = preg_replace('/(.*)(:last-child)(.*)/i', '$1$3/*[last()]', $xpath);
-
-            //[@attr="value"]:last-child - last child
-            if($match[6] == ':' && $match[8] == 'last-child'){
-                $xpath .= '/*[last()]';
-            }
-
-            //[@attr="value:first"] - first
-            $xpath = preg_replace('/(.*)(:first)(.*)/i', '$1$3[1]', $xpath);
-
-            //[@attr="value"]:first - first
-            if($match[6] == ':' && $match[8] == 'first'){
-                $xpath .= '[1]';
-            }
-
-            //[@attr="value:last"] - last
-            $xpath = preg_replace('/(.*)(:last)(.*)/i', '$1$3[last()]', $xpath);
-
-            //[@attr="value"]:last - last
-            if($match[6] == ':' && $match[8] == 'last'){
-                $xpath .= '[last()]';
-            }
-
-            //[@attr="value:n3"] - nth
-            $xpath = preg_replace('/(.*):n([0-9]{0,2})(.*)/i','$1$3[$2]', $xpath);
-
-            //[@attr="value"]:nth - nth
-            if($match[6] == ':' && $match[8] == 'n' && is_numeric($match[9])){
-                $xpath .= '['.$match[9].']';
-            }
-
+            //This does not work - will need rewriting to work like >
             //[@attr="value"]+
-            if($match[6] == '+'){
-                $node = (strlen(trim($match[8])) > 0 ? $match[8]:'*');
+            if ($Operator == '+') {
+                $node = (strlen(trim($OperatorFunction)) > 0 ? $OperatorFunction:'*');
                 $xpath .= '/following-sibling::'.$node;
             }
 
             //[@attr="value"]-
-            if($match[6] == '-'){
-                $node = (strlen(trim($match[8])) > 0 ? $match[8]:'*');
+            if ($Operator == '-') {
+                $node = (strlen(trim($OperatorFunction)) > 0 ? $OperatorFunction:'*');
                 $xpath .= '/preceding-sibling::'.$node;
             }
 
             //[@attr="value"]+/-n - next n sibling
-            if($match[6] == '-' || $match[6] == '+' AND is_numeric($match[7])){
-                $xpath .= '['.$match[7].']';
+            if ($Operator == '-' || $Operator == '+' and is_numeric($OperatorInt)) {
+                $xpath .= '['.$OperatorInt.']';
             }
 
-            if(sizeof($path) > 1){
+            if (sizeof($path) > 1) {
                 array_shift($path);
                 return $xpath . $this->_createxPath($path);
-            }else{
+            } else {
                 return $xpath;
             }
         }
@@ -147,19 +218,20 @@ $elements = $dom->find('tag[attr="name"] .class #id') any jQuery selector
         * @param mixed $context
         * @return array
         */
-        function find($path, $context = null){
+        public function find($path, $context = null)
+        {
             //Break up the path
-
+            $this->directDecendant = true;
             $xpath = $this->_createxPath(strtolower($path));
 
-            if(empty($context)) {
+            if (empty($context)) {
                 $xpath = '/'.$xpath;//.$path[0];
-            }else{
+            } else {
                 //$xpath = substr($xpath, 1);
                 $xpath = '.'.$xpath;//.$path[0];
             }
 
-            if(!$this->xpath instanceof DOMXPath){
+            if (!$this->xpath instanceof DOMXPath) {
                 $this->xpath = new DOMXPath($this->dom);
             }
 
@@ -168,25 +240,27 @@ $elements = $dom->find('tag[attr="name"] .class #id') any jQuery selector
             $found = $this->xpath->query($xpath, $context);
             $return = array();
 
-            foreach($found as $ele){
+            foreach ($found as $ele) {
                 $return[] = new fastdom_element($ele, $this);
             }
 
             return $return;
 
 
-            if(sizeof($return) > 1){
+            if (sizeof($return) > 1) {
                 //combine all returned DOMNodes
-            }else{
+            } else {
                 //Only one node, return that
                 return $return[0];
             }
-
         }
 
-        function getStyles(){
+        public function getStyles()
+        {
             //TODO: Consider the order of styles in the document
-            if(!is_null($this->styles)) return $this->styles;
+            if (!is_null($this->styles)) {
+                return $this->styles;
+            }
 
             $StyleBlocks = array();
             //Get content from all style block's
@@ -199,7 +273,7 @@ $elements = $dom->find('tag[attr="name"] .class #id') any jQuery selector
             preg_match_all('/<link.*?href="([^"]*\.css[^"]*).*?\/>/', $this->source, $ExternalFiles);
 
             //Check for imports in styles
-            foreach($StyleBlocks as $block){
+            foreach ($StyleBlocks as $block) {
                 $urls = array();
                 preg_match_all('/@import url\("([^"]*\.css[^"]*)"\)/', $block, $urls);
                 array_merge($ExternalFiles, $urls);
@@ -208,21 +282,23 @@ $elements = $dom->find('tag[attr="name"] .class #id') any jQuery selector
             //Get content of all external URLs
             $Host = parse_url($this->url, PHP_URL_HOST);
             //TODO: Slow - need to replace with multicurl (needs curl rewrite)
-            foreach($ExternalFiles as $File){
-                if(strstr($File, '://') !== false){
+            foreach ($ExternalFiles as $File) {
+                if (strstr($File, '://') !== false) {
                     $Path = parse_url($File, PHP_URL_PATH);
                     $File = 'http://'.$Host.$Path;
                 }
                 $Block = file_get_contents($File);
-                if($Block !== false) $StyleBlocks[] = $Block;
+                if ($Block !== false) {
+                    $StyleBlocks[] = $Block;
+                }
             }
 
             //Remove comments
             $this->styles = '';
 
-            foreach($StyleBlocks as $CSS){
+            foreach ($StyleBlocks as $CSS) {
                 preg_match_all('/([^\/\*]+)?(?:(?:\/\*(?:[^*]|(?:\*+[^*\/]))*\*+\/)|(?:\/\/.*))([^\/\*]+)?/', $CSS, $styles);
-                foreach($styles as $style){
+                foreach ($styles as $style) {
                     $this->styles .= $style;
                 }
             }
@@ -232,33 +308,42 @@ $elements = $dom->find('tag[attr="name"] .class #id') any jQuery selector
         }
     }
 
-    class fastdom_element{
+    class fastdom_element
+    {
         private $fastdom = null;
         private $context = null;
 
-        public function __construct(DOMElement $context, ifx_Fastdom &$fastdom){
+        public function __construct(DOMElement $context, ifx_Fastdom &$fastdom)
+        {
             $this->fastdom =& $fastdom;
             $this->context = $context;
         }
 
-        public function find($path){
+        public function find($path)
+        {
             $DOM = new ifx_Fastdom($this->outerHTML());
             return $DOM->find($path);
             //return $this->fastdom->find($path, $this->context);
         }
 
-        public function next($n = 1){
+        public function next($n = 1)
+        {
             //Get the next siblings
             $siblings = $this->find('next');
             return $siblings[$n-1];
         }
 
-        public function text($where = null){
-            if(is_null($where)) return $this->context->textContent;
+        public function text($where = null)
+        {
+            if (is_null($where)) {
+                return mb_convert_encoding($this->context->textContent, 'HTML-ENTITIES', 'UTF-8');
+            }
 
             $nodes = $this->find($where);
 
-            if(!isset($nodes[0])) return false;
+            if (!isset($nodes[0])) {
+                return false;
+            }
 
             $node = $nodes[0];
 
@@ -271,11 +356,12 @@ $elements = $dom->find('tag[attr="name"] .class #id') any jQuery selector
         * @param string $attribute
         * @return string value
         */
-        public function attr($attribute){
+        public function attr($attribute)
+        {
             return $this->context->getAttribute($attribute);
 
-            foreach($this->context->attributes as $attr){
-                if($attr->name == $attribute){
+            foreach ($this->context->attributes as $attr) {
+                if ($attr->name == $attribute) {
                     return $attr->nodeValue;
                 }
             }
@@ -283,35 +369,45 @@ $elements = $dom->find('tag[attr="name"] .class #id') any jQuery selector
             return $this->context->getAttribute($attribute);
         }
 
-        public function outerHTML($where = null){
-            if(!is_null($where)){
+        public function parent()
+        {
+        }
+
+        public function outerHTML($where = null)
+        {
+            if (!is_null($where)) {
                 $node = $this->find($where)[0];
                 return $node->innerHTML();
-            }else{
+            } else {
                 return $this->context->C14N();
             }
         }
 
-        public function innerHTML($where = null){
-            if(!is_null($where)){
+        public function innerHTML($where = null)
+        {
+            if (!is_null($where)) {
                 $node = $this->find($where);
-                if(is_array($node) && isset($node[0])) return $node[0]->innerHTML();
+                if (is_array($node) && isset($node[0])) {
+                    return $node[0]->innerHTML();
+                }
                 return '';
-            }else{
+            } else {
                 $innerHTML = '';
                 $children = $this->context->childNodes;
-                foreach($children as $child){
+                foreach ($children as $child) {
                     $innerHTML .= $child->C14N();
                 }
                 return $innerHTML;
             }
         }
 
-        public function hasClass($name){
+        public function hasClass($name)
+        {
             return strstr($this->attr('class'), $name) !== false;
         }
 
-        public function css($ele){
+        public function css($ele)
+        {
             //firstly get the style sheets
             $Styles = $this->fastdom->getStyles();
 
@@ -327,15 +423,15 @@ $elements = $dom->find('tag[attr="name"] .class #id') any jQuery selector
 
             //e.g. div#id
             $ID = $this->attr('id');
-            if($ID !== false) {
+            if ($ID !== false) {
                 preg_match_all('/(?:[\r\n]|, ?)#'.$ID.'[\r\n, ][\S\s]*?{([^}]*)}/', $Styles, $MatchedStyles);
                 $CSS = $this->textToStyles($MatchedStyles, $CSS);
             }
 
             //e.g. div.something
             $Classes = $this->attr('class');
-            if($Classes !== false){
-                foreach(explode(' ', $Classes) as $Class){
+            if ($Classes !== false) {
+                foreach (explode(' ', $Classes) as $Class) {
                     preg_match_all('/(?:[\r\n]|, ?).'.$Class.'[\r\n, ][\S\s]*?{([^}]*)}/', $Styles, $MatchedStyles);
                     $CSS = $this->textToStyles($MatchedStyles, $CSS);
                 }
@@ -343,22 +439,23 @@ $elements = $dom->find('tag[attr="name"] .class #id') any jQuery selector
 
             //and process local content
             $localStyle = $this->attr('style');
-            if($localStyle !== false) {
+            if ($localStyle !== false) {
                 $CSS = $this->textToStyles($localStyle, $CSS);
             }
 
             return $CSS;
         }
 
-        public function textToStyles($texts, $styles = array()){
-            if(!is_array($texts)){
+        public function textToStyles($texts, $styles = array())
+        {
+            if (!is_array($texts)) {
                 $ar[0] = $texts;
                 $texts = $ar;
             }
 
-            foreach($texts as $text){
+            foreach ($texts as $text) {
                 $lines = explode(';', $text);
-                foreach($lines as $line){
+                foreach ($lines as $line) {
                     $content = explode(':', $line, 2);
                     $styles[$content[0]] = $content[1];
                 }
@@ -373,8 +470,8 @@ $elements = $dom->find('tag[attr="name"] .class #id') any jQuery selector
         * @param string $attribute
         * @return bool has attribute
         */
-        public function has($attribute){
+        public function has($attribute)
+        {
             return $this->context->hasAttribute($attribute);
         }
     }
-?>

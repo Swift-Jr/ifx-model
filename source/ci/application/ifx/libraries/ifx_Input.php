@@ -8,7 +8,7 @@
         private $step = null;
         private $checked = false;
 
-        public function __construct($type, $specific = null)
+        public function __construct($type = 'input', $specific = null)
         {
             $this->type = $type;
             $this->specific = $specific;
@@ -112,7 +112,6 @@
                 </div>
             <?endif; ?>
             <?php
-
         }
 
         public function _displayCommon()
@@ -121,7 +120,6 @@
             <?if (strlen($this->step) > 0):?> step="<?=$this->step?>"<?endif; ?>
             <?if ($this->checked):?> checked<?endif; ?>
             <?php
-
         }
     }
 
