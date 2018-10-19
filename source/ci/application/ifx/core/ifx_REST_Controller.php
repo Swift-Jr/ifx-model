@@ -151,7 +151,20 @@
             self::HTTP_NOT_IMPLEMENTED => 'NOT IMPLEMENTED'
         ];
 
-        protected $allowed_http_methods = ['GET', 'DELETE', 'POST', 'PUT', 'OPTIONS', 'PATCH', 'HEAD'];
+        protected $allowed_http_methods = [
+            'GET',
+            'DELETE',
+            'POST',
+            'PUT',
+            'OPTIONS',
+            'PATCH',
+            'HEAD'
+        ];
+
+        protected $allowed_http_headers = [
+            'Content-Type',
+            'Authorization'
+        ];
 
         /**
          * List all supported methods, the first will be the default format
@@ -169,13 +182,13 @@
                 'xml' => 'application/xml'
             ];
 
-        function __construct()
+        public function __construct()
         {
             parent::__construct();
 
             $this->_check_cors();
 
-            libxml_disable_entity_loader(TRUE);
+            libxml_disable_entity_loader(true);
         }
 
         /**
@@ -187,48 +200,55 @@
         protected function _check_cors()
         {
             // Convert the config items into strings
-            //$allowed_headers = implode(' ,', $this->config->item('allowed_cors_headers'));
-            $allowed_methods = implode(' ,', $this->allowed_http_methods);
+            $config_headers = $this->config->item('allowed_cors_headers');
+            if (empty($config_headers)) {
+                $config_headers = $this->allowed_http_headers;
+            }
+            $allowed_headers = implode(' ,', $config_headers);
+
+            $config_methods = $this->config->item('allowed_cors_methods');
+            if (empty($config_methods)) {
+                $config_methods = $this->allowed_http_methods;
+            }
+            $allowed_methods = implode(' ,', $config_methods);
+
+            $allow_domains = $this->config->item('allow_any_cors_domain');
+            if (empty($allow_domains)) {
+                $allow_domains = true;
+            }
 
             // If we want to allow any domain to access the API
-            //if ($this->config->item('allow_any_cors_domain') === TRUE)
-            //{
+            if ($allow_domains === true) {
                 header('Access-Control-Allow-Origin: *');
-                header('Access-Control-Allow-Headers: Content-Type');
+                header('Access-Control-Allow-Headers: '.$allowed_headers);
                 header('Access-Control-Allow-Methods: '.$allowed_methods);
-            /*}
-            else
-            {
+            } else {
                 // We're going to allow only certain domains access
                 // Store the HTTP Origin header
                 $origin = $this->input->server('HTTP_ORIGIN');
-                if ($origin === NULL)
-                {
+                if ($origin === null) {
                     $origin = '';
                 }
 
                 // If the origin domain is in the allowed_cors_origins list, then add the Access Control headers
-                if (in_array($origin, $this->config->item('allowed_cors_origins')))
-                {
+                if (in_array($origin, $this->config->item('allowed_cors_origins'))) {
                     header('Access-Control-Allow-Origin: '.$origin);
                     header('Access-Control-Allow-Headers: '.$allowed_headers);
                     header('Access-Control-Allow-Methods: '.$allowed_methods);
                 }
-            }*/
+            }
 
             // If the request HTTP method is 'OPTIONS', kill the response and send it to the client
-            if ($this->input->method() == 'options')
-            {
+            if ($this->input->method() == 'options') {
                 exit;
             }
         }
 
-        function _remap( $method, $params = array() )
+        public function _remap($method, $params = array())
         {
             $requestmethod = $this->input->method();
 
-            if ($requestmethod === NULL)
-            {
+            if ($requestmethod === null) {
                 $requestmethod = $this->input->server('HTTP_X_HTTP_METHOD_OVERRIDE');
             }
 
@@ -242,42 +262,33 @@
 
             $call_method = $requestmethod.'_'.$method;
 
-            if ( method_exists($this, $call_method) )
-            {
-                try
-                {
-                    if ( isset($this->data['debug']) && $this->data['debug'] == 7 )
-                    {
+            if (method_exists($this, $call_method)) {
+                try {
+                    if (isset($this->data['debug']) && $this->data['debug'] == 7) {
                         call_user_func_array(array($this, $call_method), $params);
-                    }else{
+                    } else {
                         @call_user_func_array(array($this, $call_method), $params);
                     }
-                }
-                catch (Exception $ex)
-                {
+                } catch (Exception $ex) {
                     $this->response(array('classname' => get_class($ex),
                                             'message' => $ex->getMessage()), 500);
                 }
-            } else
-            {
+            } else {
                 $this->response($requestmethod.' is not supported for this REST endpoint ('.$method.')', 400);
             }
         }
 
-        function response ($content, $HTTP_result, $headers = array())
+        public function response($content, $HTTP_result, $headers = array())
         {
             //set the output status
-            if ( isset($this->http_status_codes[$HTTP_result]) )
-            {
+            if (isset($this->http_status_codes[$HTTP_result])) {
                 $this->output->set_header('HTTP/1.1 '.$HTTP_result.' '.$this->http_status_codes[$HTTP_result]);
-            }else{
+            } else {
                 set_status_header($HTTP_result);
             }
 
-            if ( is_array($headers) && count($headers) > 0)
-            {
-                foreach($headers as $item)
-                {
+            if (is_array($headers) && count($headers) > 0) {
+                foreach ($headers as $item) {
                     $this->output->set_header($item);
                 }
             }
@@ -286,13 +297,11 @@
             $this->output->set_content_type('application/json');
             $this->output->set_header('Content-Type: application/json');
 
-            if ( !is_string($content) )
-            {
+            if (!is_string($content)) {
                 $content = json_encode($content);
             }
 
-            if ( strlen($content) > 0 )
-            {
+            if (strlen($content) > 0) {
                 $this->output->set_output($content);
             }
 
@@ -305,27 +314,24 @@
             // Get the CONTENT-TYPE value from the SERVER variable
             $content_type = $this->input->server('CONTENT_TYPE');
 
-            if (empty($content_type) === FALSE)
-            {
+            if (empty($content_type) === false) {
                 // If a semi-colon exists in the string, then explode by ; and get the value of where
                 // the current array pointer resides. This will generally be the first element of the array
-                $content_type = (strpos($content_type, ';') !== FALSE ? current(explode(';', $content_type)) : $content_type);
+                $content_type = (strpos($content_type, ';') !== false ? current(explode(';', $content_type)) : $content_type);
 
                 // Check all formats against the CONTENT-TYPE header
-                foreach ($this->_supported_formats as $type => $mime)
-                {
+                foreach ($this->_supported_formats as $type => $mime) {
                     // $type = format e.g. csv
                     // $mime = mime type e.g. application/csv
 
                     // If both the mime types match, then return the format
-                    if ($content_type === $mime)
-                    {
+                    if ($content_type === $mime) {
                         return $type;
                     }
                 }
             }
 
-            return NULL;
+            return null;
         }
 
         /**
@@ -348,9 +354,11 @@
          */
         protected function _parse_post()
         {
-            $body = json_decode($this->input->raw_input_stream, TRUE);
+            $body = json_decode($this->input->raw_input_stream, true);
 
-            if ( !is_null($body) ) $this->data = array_merge($this->input->post(), $body);
+            if (!is_null($body)) {
+                $this->data = array_merge($this->input->post(), $body);
+            }
         }
 
         /**
@@ -361,7 +369,7 @@
          */
         protected function _parse_put()
         {
-            $body = json_decode($this->input->raw_input_stream, TRUE);
+            $body = json_decode($this->input->raw_input_stream, true);
 
             $this->data = $body;
         }
@@ -405,12 +413,9 @@
         protected function _parse_patch()
         {
             // It might be a HTTP body
-            if ($this->request->format)
-            {
+            if ($this->request->format) {
                 $this->request->body = $this->input->raw_input_stream;
-            }
-            else if ($this->input->method() === 'patch')
-            {
+            } elseif ($this->input->method() === 'patch') {
                 // If no filetype is provided, then there are probably just arguments
                 $this->_patch_args = $this->input->input_stream();
             }
@@ -425,8 +430,7 @@
         protected function _parse_delete()
         {
             // These should exist if a DELETE request
-            if ($this->input->method() === 'delete')
-            {
+            if ($this->input->method() === 'delete') {
                 $this->data = $this->input->input_stream();
             }
         }
@@ -442,5 +446,3 @@
             $this->_query_args = $this->input->get();
         }
     }
-
-?>
