@@ -493,6 +493,24 @@ class ifxModel_test extends TestCase
         $this->assertEquals($ExpectedParentRelationship, $ParentRelationship);
     }
 
+    public function test_decode_relationship_many_many_by_name()
+    {
+        $Many = new mMany();
+        $Multiple = new mMultiple();
+
+        $Relationship = $Many->decode('multiple');
+
+        $ExpectedRelationship = ['multiple', 'mMultiple', 3, null, 'many_multiple', 'BETWEEN'];
+
+        $this->assertEquals($ExpectedRelationship, $Relationship);
+
+        $Relationship = $Multiple->decode('many');
+
+        $ExpectedRelationship = ['many', 'mMany', 3, null, 'many_multiple', 'BETWEEN'];
+
+        $this->assertEquals($ExpectedRelationship, $Relationship);
+    }
+
     public function test_decode_relationship_many_many()
     {
         $Many = new mMany();
@@ -560,7 +578,7 @@ class ifxModel_test extends TestCase
 
         $this->assertEquals($ExpectedParentRelationship, $ParentRelationship);
     }
-
+    /*
     public function test_sanitizeName()
     {
         $Model = new mChild();
