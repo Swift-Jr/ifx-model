@@ -101,12 +101,11 @@ class ifx_Model extends CI_Model
      */
     final public function sanitizeRelationships(&$Relationships)
     {
-        foreach ($Relationships as $Alias => $ToOne) {
-            if (is_a_number($Alias)) {
-                //The ToOne is just a name e.g. object
+        foreach ($Relationships as $Alias => &$Proposed) {
+            $RealAlias = is_string($Alias) ? $Alias : $Proposed;
 
-                //Decode the object into a relationship
-                $mObject = 'm'.ucfirst($ToOne);
+            if (is_a_number($Alias) or is_string($Proposed)) {
+                $mObject = 'm'.ucfirst($Proposed);
                 $Relation = new $mObject(false);
 
                 if ($this->field_exists($Relation->_id())) {
@@ -118,50 +117,42 @@ class ifx_Model extends CI_Model
                     //3NF
                     $Field = null;
                 } else {
-                    throw new Exception("It doesn't look like there's a foreign key between ($mObject) and (".get_class($this).")");
+                    throw new Exception("117: It doesn't look like there's a foreign key between ($mObject) and (".get_class($this).")");
                 }
 
-                $Relationships[$ToOne] = [$mObject, $Field];
+                $Proposed = [$mObject, $Field];
 
-                //Finally, remove the numeric alias
-                unset($Relationships[$Alias]);
-            } elseif (is_string($ToOne)) {
-                //alias is literal, $ToOne is the table
-                $mObject = 'm'.ucfirst($ToOne);
-                $Relation = new $mObject(false);
-
-                if ($this->field_exists($Relation->_id())) {
-                    $Field = $Relation->_id();
-                } elseif ($Relation->field_exists($this->_id())) {
-                    $Field = $this->_id();
-                } else {
-                    throw new Exception("It doesn't look like there's a foreign key between ($ToOne) and (".get_class($this).")");
+                //Finally, remove any numeric alias
+                if (is_a_number($Alias)) {
+                    $Relationships[$RealAlias] = $Proposed;
+                    unset($Relationships[$Alias]);
                 }
+            }
 
-                $Relationships[$Alias] = [$mObject, $Field];
-            } elseif (is_array($ToOne)) {
+
+            if (is_array($Proposed)) {
                 //verify keys set properly
-                if (count($ToOne) == 1) {
+                if (count($Proposed) == 1) {
                     //Only a table provided, find the field
-                    list($mObject) = $ToOne;
+                    list($mObject) = $Proposed;
                     if (! class_exists($mObject)) {
                         $mmObject = 'm'.$mObject;
                         if (! class_exists($mmObject)) {
-                            throw new Exception("The relationship ($Alias) uses an undefined model ($mObject)");
+                            throw new Exception("The relationship ($RealAlias) uses an undefined model ($mObject)");
                         }
                         $mObject = $mmObject;
                     }
 
                     $Relation = new $mObject(false);
                     $Field = $Relation->_id();
-                    $Relationships[$Alias] = [$mObject, $Field];
+                    $Relationships[$RealAlias] = [$mObject, $Field];
                 }
-                if (count($ToOne) == 2) {
-                    list($mObject, $Field) = $ToOne;
+                if (count($Proposed) == 2 && !is_null($Proposed[1])) {
+                    list($mObject, $Field) = $Proposed;
                     if (! class_exists($mObject)) {
                         $mmObject = 'm'.ucfirst($mObject);
                         if (! class_exists($mmObject)) {
-                            throw new Exception("The relationship ($Alias) uses an undefined model ($mObject)");
+                            throw new Exception("The relationship ($RealAlias) uses an undefined model ($mObject)");
                         }
                         $mObject = $mmObject;
                     }
@@ -173,13 +164,13 @@ class ifx_Model extends CI_Model
                     $KeyIsForeign = $Relation->field_exists($Field);
 
                     if (!$KeyIsLocal && !$KeyIsForeign) {
-                        throw new Exception("The relationship ($Alias) uses an undefined foreign key ($Field). Looked on ($mObject and ".get_class($this)."})");
+                        throw new Exception("The relationship ($RealAlias) uses an undefined foreign key ($Field). Looked on ($mObject and ".get_class($this)."})");
                     }
-                    $Relationships[$Alias] = [$mObject, $Field];
+                    $Relationships[$RealAlias] = [$mObject, $Field];
                 }
-                if (count($ToOne) > 2) {
+                if (count($Proposed) > 2) {
                     $Self = get_class($this);
-                    throw new Exception("The relationship ($Alias) on ($Self) has too many properties");
+                    throw new Exception("The relationship ($RealAlias) on ($Self) has too many properties");
                 }
             }
         }
@@ -203,7 +194,6 @@ class ifx_Model extends CI_Model
             if (isset($this->has_many[$AliasNameOrObject])) {
                 return array_merge([$AliasNameOrObject], $this->has_many[$AliasNameOrObject]);
             }
-
             throw new Exception("The alias ($AliasNameOrObject) does not exist on (".get_class($this).")");
         }
 
@@ -1840,6 +1830,22 @@ class ifx_Model extends CI_Model
     {
         $CreateJoin = function ($AliasRelationship, $JoinToAlias) use ($JoinType) {
             list($RelationAlias, $RelationModel, $RelationForm, $RelationField, $RelationTable, $RelationLocation) = $this->decode($AliasRelationship);
+
+            if ($RelationForm === 3) {
+                $BetweenJoin['select'] = [];
+                $BetweenJoin['join'] = [
+                    'type'  => $JoinType,
+                    'table' => $RelationTable,
+                    'on'    => $JoinToAlias.'.'.$this->_id().'='.$RelationTable.'.'.$this->_id(),
+                    'where' => false
+                ];
+
+                $this->_fetch_queries['JOIN'][$RelationTable] = $BetweenJoin;
+
+                $JoinToAlias = $RelationTable;
+                $RelationField = null;
+            }
+
             if (!is_object($AliasRelationship)) {
                 $AliasRelationship = new $RelationModel;
             }
@@ -1858,6 +1864,10 @@ class ifx_Model extends CI_Model
             $JoinWhere = false;
             if ($AliasRelationship->is_loaded()) {
                 $JoinWhere = $RelationAlias.'.'.$RelationAliasField.' = '.$AliasRelationship->id();
+            }
+
+            if (is_null($RelationField)) {
+                $RelationField = $RelationAliasField;
             }
 
             $Join['select'] = $SelectFields;//$RelationAlias.'.*';

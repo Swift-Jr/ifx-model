@@ -1,3 +1,12 @@
+/*
+    testing
+    full suite: grunt test
+    specific file: grunt test --unitpath=models/test.php
+    groups: grunt test --group=failing
+
+    annotate functions with @group name e.g. @group failing
+ */
+
 module.exports = function (grunt) {
     'use strict';
 
@@ -127,6 +136,10 @@ module.exports = function (grunt) {
     var testPath = '';
     if(grunt.option('unitpath')){
         testPath = grunt.option('unitpath');
+    }
+
+    if(grunt.option('group')){
+        testPath = '--group ' + grunt.option('group');
     }
 
     grunt.config('shell', {

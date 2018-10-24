@@ -99,6 +99,26 @@ class mMultiple extends ifx_Model
     public $has_many = ['many'];
 }
 
+class mUser extends ifx_Model
+{
+    //public $has_many = ['clubs'=>'club'];
+}
+
+class mClub extends ifx_Model
+{
+    //public $has_many = ['members'=>'user'];
+}
+
+class mPlayer extends ifx_Model
+{
+    public $has_many = ['leagues'=>'league'];
+}
+
+class mLeague extends ifx_Model
+{
+    public $has_many = ['members'=>'player'];
+}
+
 class ifxModel_test extends TestCase
 {
     public function setUp()
@@ -185,6 +205,15 @@ class ifxModel_test extends TestCase
                 PRIMARY KEY(same_id),
                 FOREIGN KEY(next_id) REFERENCES same(same_id)
             );',
+
+            'CREATE TABLE many (
+                many_id INT NOT NULL AUTO_INCREMENT,
+                PRIMARY KEY(many_id)
+            );',
+            'CREATE TABLE multiple (
+                multiple_id INT NOT NULL AUTO_INCREMENT,
+                PRIMARY KEY(multiple_id)
+            );',
             'CREATE TABLE many_multiple (
                 many_multiple_id INT NOT NULL AUTO_INCREMENT,
                 many_id INT NOT NULL,
@@ -193,13 +222,39 @@ class ifxModel_test extends TestCase
                 FOREIGN KEY(many_id) REFERENCES many(many_id),
                 FOREIGN KEY(multiple_id) REFERENCES multiple(multiple_id)
             );',
-            'CREATE TABLE many (
-                many_id INT NOT NULL AUTO_INCREMENT,
-                PRIMARY KEY(many_id)
+
+            'CREATE TABLE club (
+                club_id INT NOT NULL AUTO_INCREMENT,
+                PRIMARY KEY(club_id)
             );',
-            'CREATE TABLE multiple (
-                multiple_id INT NOT NULL AUTO_INCREMENT,
-                PRIMARY KEY(multiple_id)
+            'CREATE TABLE user (
+                user_id INT NOT NULL AUTO_INCREMENT,
+                PRIMARY KEY(user_id)
+            );',
+            'CREATE TABLE user_club (
+                user_club_id INT NOT NULL AUTO_INCREMENT,
+                club_id INT NOT NULL,
+                user_id INT NOT NULL,
+                PRIMARY KEY(user_club_id),
+                FOREIGN KEY(club_id) REFERENCES club(club_id),
+                FOREIGN KEY(user_id) REFERENCES user(user_id)
+            );',
+
+            'CREATE TABLE league (
+                league_id INT NOT NULL AUTO_INCREMENT,
+                PRIMARY KEY(league_id)
+            );',
+            'CREATE TABLE player (
+                player_id INT NOT NULL AUTO_INCREMENT,
+                PRIMARY KEY(player_id)
+            );',
+            'CREATE TABLE player_league (
+                player_league_id INT NOT NULL AUTO_INCREMENT,
+                league_id INT NOT NULL,
+                player_id INT NOT NULL,
+                PRIMARY KEY(player_league_id),
+                FOREIGN KEY(league_id) REFERENCES league(league_id),
+                FOREIGN KEY(player_id) REFERENCES player(player_id)
             );',
 
             'INSERT INTO parent (parent_id, anumber) VALUES (1, 10);',
@@ -240,6 +295,18 @@ class ifxModel_test extends TestCase
             'INSERT INTO multiple (multiple_id) VALUES (1), (2), (3);',
 
             'INSERT INTO many_multiple (multiple_id, many_id) VALUES (1,1), (1,2), (2,1), (2,2);',
+
+            'INSERT INTO club (club_id) VALUES (1), (2), (3);',
+
+            'INSERT INTO user (user_id) VALUES (1), (2), (3);',
+
+            'INSERT INTO user_club (user_id, club_id) VALUES (1,1), (1,2), (2,1), (2,2);',
+
+            'INSERT INTO league (league_id) VALUES (1), (2), (3);',
+
+            'INSERT INTO player (player_id) VALUES (1), (2), (3);',
+
+            'INSERT INTO player_league (player_id, league_id) VALUES (1,1), (1,2), (2,1), (2,2);',
         ];
 
         $ci =& get_instance();
@@ -271,6 +338,12 @@ class ifxModel_test extends TestCase
             'DROP TABLE IF EXISTS many;',
             'DROP TABLE IF EXISTS multiple;',
             'DROP TABLE IF EXISTS many_multiple;',
+            'DROP TABLE IF EXISTS club;',
+            'DROP TABLE IF EXISTS user;',
+            'DROP TABLE IF EXISTS user_club;',
+            'DROP TABLE IF EXISTS league;',
+            'DROP TABLE IF EXISTS player;',
+            'DROP TABLE IF EXISTS player_league;',
         ];
 
         $ci =& get_instance();
@@ -349,6 +422,24 @@ class ifxModel_test extends TestCase
         $ExpectedChildRelationship['alias_child'] = ['mChild', 'alternate_id'];
 
         $this->assertEquals($ExpectedChildRelationship, $Model->has_many);
+    }
+
+    public function test_sanitizeRelationships_many_many_named()
+    {
+        $User = new mUser();
+        $User->has_many = ['clubs'=>'club'];
+        $User->sanitizeRelationships($User->has_many);
+
+        $ExpectedUserRelationship['clubs'] = ['mClub', null];
+        $this->assertEquals($ExpectedUserRelationship, $User->has_many);
+
+        $Club = new mClub();
+        $Club->has_many = ['members'=>'user'];
+        $Club->sanitizeRelationships($Club->has_many);
+
+        $ExpectedClubRelationship['members'] = ['mUser', null];
+
+        $this->assertEquals($ExpectedClubRelationship, $Club->has_many);
     }
 
     public function test_decodeAlias_no_alias()
@@ -468,7 +559,93 @@ class ifxModel_test extends TestCase
         $this->assertEquals($ExpectedParentRelationship, $ParentRelationship);
     }
 
-    public function test_decode_relationship()
+    public function test_decodeAlias_between()
+    {
+        $Many = new mMany();
+
+        $Relationship = $Many->decodeAlias('multiple');
+
+        $Expected = ['multiple', 'mMultiple', null];
+
+        $this->assertEquals($Expected, $Relationship);
+
+        $Multiple = new mMultiple();
+
+        $Relationship = $Multiple->decodeAlias('many');
+
+        $Expected = ['many', 'mMany', null];
+
+        $this->assertEquals($Expected, $Relationship);
+    }
+
+    public function test_decodeAlias_between_alias()
+    {
+        $User = new mUser();
+        $User->has_many = ['clubs' => 'club'];
+        $User->sanitizeRelationships($User->has_many);
+
+        $Relationship = $User->decodeAlias('clubs');
+
+        $Expected = ['clubs', 'mClub', null];
+
+        $this->assertEquals($Expected, $Relationship);
+
+        $Club = new mClub();
+        $Club->has_many = ['members' => 'user'];
+        $Club->sanitizeRelationships($Club->has_many);
+
+        $Relationship = $Club->decodeAlias('members');
+
+        $Expected = ['members', 'mUser', null];
+
+        $this->assertEquals($Expected, $Relationship);
+    }
+
+    public function test_decodeRelationship_between()
+    {
+        $Many = new mMany();
+
+        $Relationship = $Many->decodeRelationship(new mMultiple);
+
+        $Expected = [3, null, 'many_multiple', 'BETWEEN'];
+
+        $this->assertEquals($Expected, $Relationship);
+
+        $Multiple = new mMultiple();
+
+        $Relationship = $Multiple->decodeRelationship(new mMany);
+
+        $Expected = [3, null, 'many_multiple', 'BETWEEN'];
+
+        $this->assertEquals($Expected, $Relationship);
+    }
+
+    public function test_decodeRelationship_many_many_alias()
+    {
+        $User = new mUser();
+        $User->has_many = ['clubs' => 'club'];
+        $User->sanitizeRelationships($User->has_many);
+
+        $Club = new mClub();
+        $Club->has_many = ['members' => 'user'];
+        $Club->sanitizeRelationships($Club->has_many);
+
+
+        $Relationship = $User->decodeRelationship($Club);
+
+        $Expected = [3, null, 'user_club', 'BETWEEN'];
+
+        $this->assertEquals($Expected, $Relationship);
+
+
+        $Relationship = $Club->decodeRelationship($User);
+
+        $Expected = [3, null, 'user_club', 'BETWEEN'];
+
+        $this->assertEquals($Expected, $Relationship);
+    }
+
+    public function test_decode()
     {
         // list($Alias, $Model, $Form, $KeyField, $KeyTable, $KeyLocation)
 
@@ -493,7 +670,7 @@ class ifxModel_test extends TestCase
         $this->assertEquals($ExpectedParentRelationship, $ParentRelationship);
     }
 
-    public function test_decode_relationship_many_many_by_name()
+    public function test_decode_many_many_by_name()
     {
         $Many = new mMany();
         $Multiple = new mMultiple();
@@ -511,7 +688,7 @@ class ifxModel_test extends TestCase
         $this->assertEquals($ExpectedRelationship, $Relationship);
     }
 
-    public function test_decode_relationship_many_many()
+    public function test_decode_many_many_by_model()
     {
         $Many = new mMany();
         $Multiple = new mMultiple();
@@ -525,6 +702,27 @@ class ifxModel_test extends TestCase
         $Relationship = $Multiple->decode($Many);
 
         $ExpectedRelationship = ['many', 'mMany', 3, null, 'many_multiple', 'BETWEEN'];
+
+        $this->assertEquals($ExpectedRelationship, $Relationship);
+    }
+
+    public function test_decode_many_many_by_alias()
+    {
+        $Player = new mPlayer();
+
+        $League = new mLeague();
+
+
+        $Relationship = $Player->decode('leagues');
+
+        $ExpectedRelationship = ['leagues', 'mLeague', 3, null, 'player_league', 'BETWEEN'];
+
+        $this->assertEquals($ExpectedRelationship, $Relationship);
+
+
+        $Relationship = $League->decode('members');
+
+        $ExpectedRelationship = ['members', 'mPlayer', 3, null, 'player_league', 'BETWEEN'];
 
         $this->assertEquals($ExpectedRelationship, $Relationship);
     }
@@ -578,7 +776,7 @@ class ifxModel_test extends TestCase
 
         $this->assertEquals($ExpectedParentRelationship, $ParentRelationship);
     }
-    /*
+
     public function test_sanitizeName()
     {
         $Model = new mChild();
@@ -961,7 +1159,6 @@ class ifxModel_test extends TestCase
         $Numbers = new mNumber();
         $Results = $Numbers->fetch();
 
-        $Expected = [];
         $Expected = [
             [
                 'number_id'=>1,
@@ -1079,12 +1276,88 @@ class ifxModel_test extends TestCase
         $this->assertFalse(array_key_exists('anumber', reset($Result)->_data));
     }
 
+    public function test_with_2nf()
+    {
+        $Town = new mTown(1);
+        $Town->with('city');
+
+        $Expected = [
+            'JOIN' => [
+                'city' => [
+                    'select' => [
+                        'city.city_id AS `city.city_id`',
+                        'city.name AS `city.name`',
+                        'city.country_id AS `city.country_id`'
+                    ],
+                    'join' => [
+                        'type' => 'LEFT',
+                        'table' => 'city AS city',
+                        'on' => 'town.city_id=city.city_id',
+                        'where' => false
+                    ]
+                ]
+            ],
+            'LOADS' => [
+                'mTown' => [
+                    'city'
+                ]
+            ]
+        ];
+
+        $this->assertEquals($Expected, $Town->_fetch_queries);
+    }
+
+    /**
+     * @group suspect
+     */
+    public function test_with_3nf()
+    {
+        $League = new mLeague(1);
+        $League->with('members');
+
+        $Expected = [
+            'JOIN' => [
+                'player_league' => [
+                    'select' => [
+
+                    ],
+                    'join' => [
+                        'type' => 'LEFT',
+                        'table' => 'player_league',
+                        'on' => 'league.league_id=player_league.league_id',
+                        'where' => false
+                    ]
+                ],
+                'members' => [
+                    'select' => [
+                        'members.player_id AS `members.player_id`'
+                    ],
+                    'join' => [
+                        'type' => 'LEFT',
+                        'table' => 'player AS members',
+                        'on' => 'player_league.player_id=members.player_id',
+                        'where' => false
+                    ]
+                ]
+            ],
+            'LOADS' => [
+                'mLeague' => [
+                    'members'
+                ]
+            ]
+        ];
+
+        $this->assertEquals($Expected, $League->_fetch_queries);
+    }
 
     //Via returns a joined dataset
     //e.g. $Customer->with('orders/status')->fetch() returns customer+orders+status
     //
     //with(objects,)
-    public function test_with()
+    /**
+     * @group suspect
+     */
+    public function test_with_fetch_2nf()
     {
         //TODO: Test fetch returns an associate array of $array[$ModelID] = $Model->$ModelID
         $Town = new mTown(1);
@@ -1127,11 +1400,30 @@ class ifxModel_test extends TestCase
         $this->assertInstanceOf('mCountry', $Result[0]->_objects['city']->_objects['country']);
     }
 
+    /**
+     * @group suspect
+     */
+    public function test_with_fetch_3nf()
+    {
+        $Many = new mMany(1);
+        $Result = $Many->with('multiple')->fetch();
+
+        $Expected = [
+            'many_id'=>'1',
+            'multiple.multiple_id'=>'1'
+        ];
+
+        $this->assertEquals($Expected, $Result[0]->_data);
+        $this->assertInstanceOf('mMultiple', reset($Result[0]->_objects['multiple']));
+    }
+
     //Via joins, return the related models
     //e.g. $Customer->related('orders/product')->fetch() returns all products
-    public function test_related()
+    /**
+     * @group suspect
+     */
+    public function test_related_2nf()
     {
-        //Probably need to start by testing the results of _fetch_query['join']
         $Town = new mTown(1);
         $Country = $Town->related('city/country');
         $this->assertInstanceOf('mCountry', reset($Country));
@@ -1142,6 +1434,34 @@ class ifxModel_test extends TestCase
         $this->assertEquals(3, count($Towns));
         $this->assertInstanceOf('mTown', reset($Towns));
         $this->assertEquals('Kensington', reset($Towns)->name);
+    }
+
+    /**
+     * @group suspect
+     */
+    public function test_related_3nf()
+    {
+        $Many = new mMany(1);
+        $Multiples = $Many->related('multiple');
+        $this->assertInstanceOf('mMultiple', reset($Multiples));
+
+        $Multiple = new mMultiple(1);
+        $Manys = $Multiple->related('many');
+        $this->assertInstanceOf('mMany', reset($Manys));
+    }
+
+    /**
+     * @group suspect
+     */
+    public function test_related_3nf_alias()
+    {
+        $League = new mLeague(1);
+        $Players = $League->related('members');
+        $this->assertInstanceOf('mPlayer', reset($Players));
+
+        $Player = new mPlayer(1);
+        $Leagues = $Player->related('leagues');
+        $this->assertInstanceOf('mLeague', reset($Leagues));
     }
 
     public function test_flatten_result()
