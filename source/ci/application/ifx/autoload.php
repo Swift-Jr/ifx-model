@@ -60,6 +60,8 @@ class ifx_Autoloader
             }
         }
 
+        $class = str_replace('CI_', '', $class);
+
         foreach ($this->_ci_paths as $route) {
             if ($this->_load_file(BASEPATH.$route.'/', $class)) {
                 return true;
