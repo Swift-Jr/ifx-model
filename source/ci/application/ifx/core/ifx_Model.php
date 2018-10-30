@@ -235,9 +235,12 @@ class ifx_Model extends CI_Model
     * @param ifx_Model $Relationship
     * @return Array [form, keyfield, keytable, location]
     */
-    final public function decodeRelationship(ifx_Model $Relationship)
+    final public function decodeRelationship(ifx_Model $Relationship, $Alias = null)
     {
-        list($Alias, $Model, $Key) = $this->decodeAlias($Relationship);
+        if (is_null($Alias)) {
+            $Alias = $Relationship;
+        }
+        list($Alias, $Model, $Key) = $this->decodeAlias($Alias);
 
         $Self = get_class($this);
 
@@ -315,7 +318,7 @@ class ifx_Model extends CI_Model
             list($Alias, $Model, $Field) = $this->decodeAlias($RelationshipOrAlias);
         } else {
             list($Alias, $Model, $Field) = $this->decodeAlias($RelationshipOrAlias);
-            list($Form, $Field, $Table, $Location) = $this->decodeRelationship(new $Model);
+            list($Form, $Field, $Table, $Location) = $this->decodeRelationship(new $Model, $Alias);
         }
 
         return [$Alias, $Model, $Form, $Field, $Table, $Location];
