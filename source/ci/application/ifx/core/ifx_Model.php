@@ -1873,6 +1873,10 @@ class ifx_Model extends CI_Model
                 $RelationField = $RelationAliasField;
             }
 
+            if ($RelationForm == 2 && !in_array($RelationField, array_values($this->fields()))) {
+                $RelationField = $this->_id();
+            }
+
             $Join['select'] = $SelectFields;//$RelationAlias.'.*';
             $Join['join'] = [
                 'type'  => $JoinType,
